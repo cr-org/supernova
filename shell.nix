@@ -1,12 +1,14 @@
+{ compiler ? "ghc883" }:
+
 let
   pkgs = import ./pkgs.nix;
-  drv  = import ./default.nix { inherit pkgs; };
+  drv  = pkgs.haskell.packages.${compiler}.callCabal2nix "hpulsar" ./. {};
 
   inherit (pkgs) haskellPackages;
 in
   {
     my_project = drv;
-    shell = haskellPackages.shellFor {
+    shell = pkgs.haskell.packages.${compiler}.shellFor {
       name = "ghc-shell-for-hpulsar";
       packages = p: [drv];
       buildInputs = with haskellPackages; [
