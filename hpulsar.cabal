@@ -24,6 +24,7 @@ custom-setup
 
 library
   exposed-modules:     Pulsar
+                     , TCPClient
   other-modules:       Paths_hpulsar
                      , Proto.PulsarApi
                      , Proto.PulsarApi_Fields
@@ -32,6 +33,7 @@ library
   build-depends:       base
                      , bytestring
                      , lens-family-core
+                     , network
                      , proto-lens
                      , proto-lens-runtime
                      , text
