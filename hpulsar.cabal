@@ -24,7 +24,8 @@ custom-setup
 
 library
   exposed-modules:     Pulsar
-  other-modules:       Proto.PulsarApi
+  other-modules:       Paths_hpulsar
+                     , Proto.PulsarApi
                      , Proto.PulsarApi_Fields
   autogen-modules:     Proto.PulsarApi
                      , Proto.PulsarApi_Fields
@@ -33,6 +34,7 @@ library
                      , lens-family-core
                      , proto-lens
                      , proto-lens-runtime
+                     , text
   hs-source-dirs:      src
   default-language:    Haskell2010
 
