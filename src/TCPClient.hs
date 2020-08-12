@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE LambdaCase, OverloadedStrings #-}
 
 module TCPClient
   ( send
@@ -35,7 +35,9 @@ runTCPClient host port client = withSocketsDo $ do
  where
   resolve = do
     let hints = defaultHints { addrSocketType = Stream }
-    head <$> getAddrInfo (Just hints) (Just host) (Just port)
+    getAddrInfo (Just hints) (Just host) (Just port) >>= \case
+      [addr] -> pure addr
+      _      -> E.ioError $ userError "Could not resolve socket address"
   open addr = E.bracketOnError (openSocket addr) close $ \sock -> do
     connect sock $ addrAddress addr
     return sock
