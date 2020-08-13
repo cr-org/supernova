@@ -43,8 +43,8 @@ data Payload = PayloadCommand
   , payload :: CL.ByteString        -- Anything left in the frame is considered the payload and can include any sequence of bytes
   }
 
-mkSimpleFrame :: BaseCommand -> Frame
-mkSimpleFrame cmd = SimpleFrame $
+mkSimpleCommand :: BaseCommand -> Simple
+mkSimpleCommand cmd =
   SimpleCommand { totalSize   = cmdSize + 4
                 , commandSize = cmdSize
                 , message     = msg
@@ -53,8 +53,11 @@ mkSimpleFrame cmd = SimpleFrame $
   msg     = CL.fromStrict $ PL.encodeMessage cmd
   cmdSize = fromIntegral $ CL.length msg
 
-mkPayloadFrame :: BaseCommand -> Frame
-mkPayloadFrame = undefined
+mkPayloadCommand :: BaseCommand -> (Simple, Payload)
+mkPayloadCommand cmd =
+  let simple  = mkSimpleCommand cmd
+      payload = undefined
+  in  (simple, payload)
 
 encodeFrame :: Frame -> C.ByteString
 encodeFrame (SimpleFrame (SimpleCommand ts cs base)) =
@@ -65,8 +68,8 @@ encodeFrame (PayloadFrame _ _) = undefined
 
 encodeBaseCommand :: BaseCommand -> C.ByteString
 encodeBaseCommand cmd =
-  let sf = encodeFrame . mkSimpleFrame
-      pf = encodeFrame . mkPayloadFrame
+  let sf = encodeFrame . SimpleFrame . mkSimpleCommand
+      pf = encodeFrame . (uncurry PayloadFrame) . mkPayloadCommand
   in  if isSimple cmd then sf cmd else pf cmd
 
 isSimple :: BaseCommand -> Bool
