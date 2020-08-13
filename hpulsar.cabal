@@ -23,7 +23,8 @@ custom-setup
   build-tool-depends:  proto-lens-protoc:proto-lens-protoc
 
 library
-  exposed-modules:     Pulsar
+  exposed-modules:     Frame
+                     , Pulsar
                      , TCPClient
   other-modules:       Paths_hpulsar
                      , Proto.PulsarApi
