@@ -31,6 +31,7 @@ library
   autogen-modules:     Proto.PulsarApi
                      , Proto.PulsarApi_Fields
   build-depends:       base
+                     , binary
                      , bytestring
                      , lens-family-core
                      , network
