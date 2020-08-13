@@ -25,30 +25,44 @@ import           Proto.PulsarApi                ( BaseCommand )
  -}
 --maxFrameSize = 5 * 1024 * 1024 -- 5mb
 
+data Frame = SimpleFrame SimpleCommand | PayloadFrame PayloadCommand
+
 -- Simple command: http://pulsar.apache.org/docs/en/develop-binary-protocol/#simple-commands
-data Frame = Frame
-  { commandSize :: Int32          -- The size of the protobuf-serialized command
-  , totalSize :: Int32            -- The size of the frame, counting everything that comes after it (in bytes)
-  , baseCommand :: CL.ByteString  -- The protobuf message serialized in a raw binary format (rather than in protobuf format)
+data SimpleCommand = SimpleCommand
+  { totalSize :: Int32        -- The size of the frame, counting everything that comes after it (in bytes)
+  , commandSize :: Int32      -- The size of the protobuf-serialized command
+  , message :: CL.ByteString  -- The protobuf message serialized in a raw binary format (rather than in protobuf format)
   }
 
-mkFrame :: BaseCommand -> Frame
-mkFrame cmd = Frame { commandSize = cmdSize
-                    , totalSize   = cmdSize + 4
-                    , baseCommand = message
-                    }
+-- Payload command: http://pulsar.apache.org/docs/en/develop-binary-protocol/#payload-commands
+data PayloadCommand = PayloadCommand
+  { simpleCommand :: SimpleCommand  -- Total size, command size and message
+  , magicNumber :: Int32            -- A 2-byte byte array (0x0e01) identifying the current format
+  , checkSum :: Int32               -- A CRC32-C checksum of everything that comes after it
+  , metadataSize :: Int32           -- The size of the message metadata
+  , metadata :: CL.ByteString       -- The message metadata stored as a binary protobuf message
+  , payload :: CL.ByteString        -- Anything left in the frame is considered the payload and can include any sequence of bytes
+  }
+
+mkSimpleFrame :: BaseCommand -> Frame
+mkSimpleFrame cmd = SimpleFrame $
+  SimpleCommand { totalSize   = cmdSize + 4
+                , commandSize = cmdSize
+                , message     = msg
+                }
  where
-  message = CL.fromStrict $ PL.encodeMessage cmd
-  cmdSize = fromIntegral $ CL.length message
+  msg     = CL.fromStrict $ PL.encodeMessage cmd
+  cmdSize = fromIntegral $ CL.length msg
 
 encodeFrame :: Frame -> C.ByteString
-encodeFrame (Frame cs ts base) =
+encodeFrame (SimpleFrame (SimpleCommand ts cs base)) =
   let totalSize   = B.runPut $ B.putInt32be ts
       commandSize = B.runPut $ B.putInt32be cs
   in  BL.toStrict $ totalSize <> commandSize <> base
+encodeFrame (PayloadFrame _) = undefined
 
 encodeBaseCommand :: BaseCommand -> C.ByteString
-encodeBaseCommand = encodeFrame . mkFrame
+encodeBaseCommand = encodeFrame . mkSimpleFrame
 
 send :: BaseCommand -> IO ()
 send cmd = runTCPClient "127.0.0.1" "6650" $ \s -> do
