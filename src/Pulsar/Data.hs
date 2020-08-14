@@ -1,6 +1,9 @@
 module Pulsar.Data where
 
 import           Data.Char                      ( toLower )
+import           Data.Text                      ( Text )
+
+------- Topic ---------
 
 data Topic = Topic
   { type' :: TopicType
@@ -40,3 +43,7 @@ newtype TopicName = TopicName String
 
 instance Show TopicName where
   show (TopicName t) = t
+
+------- Subscription ---------
+
+newtype SubscriptionName = SubscriptionName Text deriving Show

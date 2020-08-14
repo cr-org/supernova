@@ -20,15 +20,15 @@ cmdConnect = defMessage
     & F.clientVersion .~ "Pulsar-Client-Haskell-v" <> T.pack (showVersion version)
     & F.protocolVersion .~ 15
 
-cmdSubscribe :: Topic -> BaseCommand
-cmdSubscribe topic = defMessage
+cmdSubscribe :: Topic -> SubscriptionName -> BaseCommand
+cmdSubscribe topic (SubscriptionName sub) = defMessage
     & F.type' .~ BaseCommand'SUBSCRIBE
     & F.subscribe .~ subscribe
  where
   subscribe :: CommandSubscribe
   subscribe = defMessage
     & F.topic .~ T.pack (show topic)
-    & F.subscription .~ "test-subscription"
+    & F.subscription .~ sub
     & F.subType .~ CommandSubscribe'Shared
 
 cmdProducer :: Topic -> BaseCommand

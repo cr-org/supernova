@@ -32,11 +32,11 @@ producer topic = do
   send s $ cmdProducer topic
   receive s
 
-subscribe :: (MonadIO m, MonadReader Connection m) => Topic -> m ()
-subscribe topic = do
+subscribe :: (MonadIO m, MonadReader Connection m) => Topic -> SubscriptionName -> m ()
+subscribe topic subs = do
   (Conn s) <- ask
-  liftIO . print $ cmdSubscribe topic
-  send s $ cmdSubscribe topic
+  liftIO . print $ cmdSubscribe topic subs
+  send s $ cmdSubscribe topic subs
   receive s
 
 --producer :: (MonadIO m, MonadResource m) => Connection -> m ()
