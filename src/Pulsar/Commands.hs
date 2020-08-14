@@ -9,40 +9,60 @@ import           Lens.Family
 import           Paths_hpulsar                  ( version )
 import           Proto.PulsarApi
 import qualified Proto.PulsarApi_Fields        as F
-import Pulsar.Data
+import           Pulsar.Types
 
-cmdConnect :: BaseCommand
-cmdConnect = defMessage
-    & F.connect .~ connect
+connect :: BaseCommand
+connect = defMessage
+    & F.connect .~ conn
  where
-  connect :: CommandConnect
-  connect = defMessage
+  conn :: CommandConnect
+  conn = defMessage
     & F.clientVersion .~ "Pulsar-Client-Haskell-v" <> T.pack (showVersion version)
     & F.protocolVersion .~ 15
 
-cmdSubscribe :: Topic -> SubscriptionName -> BaseCommand
-cmdSubscribe topic (SubscriptionName sub) = defMessage
+subscribe :: Topic -> SubscriptionName -> BaseCommand
+subscribe topic (SubscriptionName sub) = defMessage
     & F.type' .~ BaseCommand'SUBSCRIBE
-    & F.subscribe .~ subscribe
+    & F.subscribe .~ subs
  where
-  subscribe :: CommandSubscribe
-  subscribe = defMessage
+  subs :: CommandSubscribe
+  subs = defMessage
     & F.topic .~ T.pack (show topic)
     & F.subscription .~ sub
     & F.subType .~ CommandSubscribe'Shared
 
-cmdProducer :: Topic -> BaseCommand
-cmdProducer topic = defMessage
+producer :: Topic -> BaseCommand
+producer topic = defMessage
     & F.type' .~ BaseCommand'PRODUCER
-    & F.producer .~ producer
+    & F.producer .~ prod
  where
-  producer :: CommandProducer
-  producer = defMessage
+  prod :: CommandProducer
+  prod = defMessage
     & F.topic .~ T.pack (show topic)
     & F.producerId .~ 0
     & F.requestId .~ 0
 
-cmdPing :: BaseCommand
-cmdPing = defMessage
+closeProducer :: BaseCommand
+closeProducer = defMessage
+    & F.type' .~ BaseCommand'CLOSE_PRODUCER
+    & F.closeProducer .~ prod
+ where
+  prod :: CommandCloseProducer
+  prod = defMessage
+    & F.producerId .~ 0
+    & F.requestId .~ 0
+
+send :: BaseCommand
+send = defMessage
+    & F.type' .~ BaseCommand'SEND
+    & F.send .~ defMessage
+
+ping :: BaseCommand
+ping = defMessage
     & F.type' .~ BaseCommand'PING
-    & F.ping .~ (defMessage :: CommandPing)
+    & F.ping .~ defMessage
+
+------- Metadata for Payload commands --------
+
+singleMessageMetadata :: SingleMessageMetadata
+singleMessageMetadata = defMessage

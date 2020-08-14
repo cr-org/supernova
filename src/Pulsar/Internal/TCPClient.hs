@@ -12,13 +12,14 @@ import           Control.Monad.Managed
 import qualified Network.Socket                as NS
 
 acquireSocket
-  :: (MonadIO m, MonadManaged m)
-  => NS.HostName
-  -> NS.ServiceName
-  -> m NS.Socket
+  :: (MonadIO m, MonadManaged m) => NS.HostName -> NS.ServiceName -> m NS.Socket
 acquireSocket host port = do
   addr <- liftIO resolve
-  using $ managed (E.bracket (open addr) NS.close)
+  using $ managed
+    (E.bracket
+      (open addr)
+      (\s -> putStrLn "<< Closing Pulsar connection >>" >> NS.close s)
+    )
  where
   resolve = do
     let hints = NS.defaultHints { NS.addrSocketType = NS.Stream }

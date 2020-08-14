@@ -7,8 +7,11 @@ import           Control.Monad.Managed
 import qualified Network.Socket                as NS
 import qualified Network.Socket.ByteString     as BS
 import           Proto.PulsarApi                ( BaseCommand )
-import           Pulsar.Commands                ( cmdConnect )
-import           Pulsar.Internal.Frame          ( encodeBaseCommand )
+import qualified Pulsar.Commands               as P
+import           Pulsar.Internal.Frame          ( Metadata
+                                                , Payload
+                                                , encodeBaseCommand
+                                                )
 import           Pulsar.Internal.TCPClient      ( acquireSocket )
 
 newtype Connection = Conn NS.Socket
@@ -24,12 +27,18 @@ defaultConnectData = ConnData { connHost = "127.0.0.1", connPort = "6650" }
 connect :: (MonadIO m, MonadManaged m) => ConnectData -> m Connection
 connect (ConnData h p) = do
   sock <- acquireSocket h p
-  liftIO $ send sock cmdConnect
+  liftIO $ sendSimpleCmd sock P.connect
   liftIO $ putStrLn "<< Successfully connected to Apache Pulsar >>"
   return $ Conn sock
 
-send :: MonadIO m => NS.Socket -> BaseCommand -> m ()
-send s cmd = liftIO . BS.sendAll s $ encodeBaseCommand cmd
+sendSimpleCmd :: MonadIO m => NS.Socket -> BaseCommand -> m ()
+sendSimpleCmd s cmd =
+  liftIO . BS.sendAll s $ encodeBaseCommand Nothing Nothing cmd
+
+sendPayloadCmd
+  :: MonadIO m => NS.Socket -> BaseCommand -> Metadata -> Maybe Payload -> m ()
+sendPayloadCmd s cmd meta payload =
+  liftIO . BS.sendAll s $ encodeBaseCommand (Just meta) payload cmd
 
 --TODO: once we have the parser, this should return IO BaseCommand
 receive :: MonadIO m => NS.Socket -> m ()

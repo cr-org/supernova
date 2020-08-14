@@ -30,9 +30,10 @@ library
                      , Pulsar.Commands
                      , Pulsar.Core
                      , Pulsar.Connection
-                     , Pulsar.Data
+                     , Pulsar.Internal.Core
                      , Pulsar.Internal.Frame
                      , Pulsar.Internal.TCPClient
+                     , Pulsar.Types
   autogen-modules:     Proto.PulsarApi
                      , Proto.PulsarApi_Fields
   build-depends:       base

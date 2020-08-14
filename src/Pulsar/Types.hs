@@ -1,6 +1,8 @@
-module Pulsar.Data where
+module Pulsar.Types where
 
+import qualified Data.ByteString.Lazy.Char8    as CL
 import           Data.Char                      ( toLower )
+import           Data.String
 import           Data.Text                      ( Text )
 
 ------- Topic ---------
@@ -13,7 +15,7 @@ data Topic = Topic
   }
 
 defaultTopic :: String -> Topic
-defaultTopic n = Topic { type'     = Persistent
+defaultTopic n = Topic { type'     = NonPersistent
                        , tenant    = Tenant "public"
                        , namespace = NameSpace "default"
                        , name      = TopicName n
@@ -43,6 +45,11 @@ newtype TopicName = TopicName String
 
 instance Show TopicName where
   show (TopicName t) = t
+
+newtype PulsarMessage = PulsarMessage CL.ByteString deriving Show
+
+instance IsString PulsarMessage where
+  fromString = PulsarMessage . CL.pack
 
 ------- Subscription ---------
 

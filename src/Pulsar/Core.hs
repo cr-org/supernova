@@ -1,16 +1,18 @@
-{-# LANGUAGE FlexibleContexts, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 module Pulsar.Core where
 
 import           Control.Monad.IO.Class
 import           Control.Monad.Managed
 import           Control.Monad.Reader
-import           Pulsar.Commands
+import           Data.IORef
+import qualified Pulsar.Commands               as P
 import           Pulsar.Connection
-import           Pulsar.Data
-
-newtype Pulsar a = Pulsar (ReaderT Connection IO a)
-  deriving (Functor, Applicative, Monad, MonadIO, MonadReader Connection)
+import           Pulsar.Internal.Core
+import           Pulsar.Internal.Frame          ( Metadata(..)
+                                                , Payload(..)
+                                                )
+import           Pulsar.Types
 
 class Monad m => MonadPulsar m where
   liftPulsar :: Pulsar a -> m a
@@ -18,27 +20,47 @@ class Monad m => MonadPulsar m where
 instance MonadPulsar Pulsar where
   liftPulsar = id
 
-ping :: (MonadIO m, MonadReader Connection m) => m ()
-ping = do
-  (Conn s) <- ask
-  liftIO . print $ cmdPing
-  send s cmdPing
-  receive s
-
-producer :: (MonadIO m, MonadReader Connection m) => Topic -> m ()
-producer topic = do
-  (Conn s) <- ask
-  liftIO . print $ cmdProducer topic
-  send s $ cmdProducer topic
-  receive s
-
-subscribe
-  :: (MonadIO m, MonadReader Connection m) => Topic -> SubscriptionName -> m ()
-subscribe topic subs = do
-  (Conn s) <- ask
-  liftIO . print $ cmdSubscribe topic subs
-  send s $ cmdSubscribe topic subs
-  receive s
-
 runPulsar :: Connection -> Pulsar a -> IO a
-runPulsar conn (Pulsar m) = runReaderT m conn
+runPulsar conn (Pulsar m) = do
+  producers <- newIORef []
+  runReaderT m (Ctx conn producers)
+
+------ Simple commands ------
+
+ping :: (MonadIO m, MonadReader PulsarCtx m) => m ()
+ping = do
+  (Ctx (Conn s) _) <- ask
+  liftIO . print $ P.ping
+  sendSimpleCmd s P.ping
+  receive s
+
+newProducer :: (MonadIO m, MonadReader PulsarCtx m) => Topic -> m ()
+newProducer topic = do
+  (Ctx (Conn s) _) <- ask
+  liftIO . print $ P.producer topic
+  sendSimpleCmd s $ P.producer topic
+  receive s
+
+closeProducer :: (MonadIO m, MonadReader PulsarCtx m) => m ()
+closeProducer = do
+  (Ctx (Conn s) _) <- ask
+  liftIO . print $ P.closeProducer
+  sendSimpleCmd s P.closeProducer
+  receive s
+
+newSubscriber
+  :: (MonadIO m, MonadReader PulsarCtx m) => Topic -> SubscriptionName -> m ()
+newSubscriber topic subs = do
+  (Ctx (Conn s) _) <- ask
+  liftIO . print $ P.subscribe topic subs
+  sendSimpleCmd s $ P.subscribe topic subs
+  receive s
+
+------ Payload commands ------
+
+send :: (MonadIO m, MonadReader PulsarCtx m) => PulsarMessage -> m ()
+send (PulsarMessage msg) = do
+  (Ctx (Conn s) _) <- ask
+  liftIO . print $ P.send
+  sendPayloadCmd s P.send (Single P.singleMessageMetadata) (Just $ Payload msg)
+  receive s
