@@ -22,22 +22,22 @@ ping :: (MonadIO m, MonadReader Connection m) => m ()
 ping = do
   (Conn s) <- ask
   liftIO . print $ cmdPing
-  liftIO $ send s cmdPing
-  liftIO $ receive s
+  send s cmdPing
+  receive s
 
 producer :: (MonadIO m, MonadReader Connection m) => Topic -> m ()
 producer topic = do
   (Conn s) <- ask
   liftIO . print $ cmdProducer topic
-  liftIO . send s $ cmdProducer topic
-  liftIO $ receive s
+  send s $ cmdProducer topic
+  receive s
 
 subscribe :: (MonadIO m, MonadReader Connection m) => Topic -> m ()
 subscribe topic = do
   (Conn s) <- ask
   liftIO . print $ cmdSubscribe topic
-  liftIO . send s $ cmdSubscribe topic
-  liftIO $ receive s
+  send s $ cmdSubscribe topic
+  receive s
 
 --producer :: (MonadIO m, MonadResource m) => Connection -> m ()
 --producer (Conn s) = liftIO $ send s cmdProducer >> receive s

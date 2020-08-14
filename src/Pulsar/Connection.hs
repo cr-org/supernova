@@ -28,11 +28,11 @@ connect (ConnData h p) = do
   liftIO $ putStrLn "<< Successfully connected to Apache Pulsar >>"
   return $ Conn sock
 
-send :: NS.Socket -> BaseCommand -> IO ()
-send s cmd = BS.sendAll s $ encodeBaseCommand cmd
+send :: MonadIO m => NS.Socket -> BaseCommand -> m ()
+send s cmd = liftIO . BS.sendAll s $ encodeBaseCommand cmd
 
 --TODO: once we have the parser, this should return IO BaseCommand
-receive :: NS.Socket -> IO ()
-receive s = do
+receive :: MonadIO m => NS.Socket -> m ()
+receive s = liftIO $ do
   msg <- BS.recv s 4096
   print $ "Received: " <> msg
