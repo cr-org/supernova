@@ -23,21 +23,28 @@ custom-setup
   build-tool-depends:  proto-lens-protoc:proto-lens-protoc
 
 library
-  exposed-modules:     Frame
-                     , Pulsar
-                     , TCPClient
+  exposed-modules:     Pulsar
   other-modules:       Paths_hpulsar
                      , Proto.PulsarApi
                      , Proto.PulsarApi_Fields
+                     , Pulsar.Commands
+                     , Pulsar.Core
+                     , Pulsar.Connection
+                     , Pulsar.Data
+                     , Pulsar.Internal.Frame
+                     , Pulsar.Internal.TCPClient
   autogen-modules:     Proto.PulsarApi
                      , Proto.PulsarApi_Fields
   build-depends:       base
                      , binary
                      , bytestring
+                     , crc32c
                      , lens-family-core
+                     , mtl
                      , network
                      , proto-lens
                      , proto-lens-runtime
+                     , resourcet
                      , text
   hs-source-dirs:      src
   default-language:    Haskell2010
