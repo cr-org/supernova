@@ -3,8 +3,8 @@
 module Pulsar.Core where
 
 import           Control.Monad.IO.Class
+import           Control.Monad.Managed
 import           Control.Monad.Reader
-import           Control.Monad.Trans.Resource
 import           Pulsar.Commands
 import           Pulsar.Connection
 import           Pulsar.Data
@@ -32,17 +32,13 @@ producer topic = do
   send s $ cmdProducer topic
   receive s
 
-subscribe :: (MonadIO m, MonadReader Connection m) => Topic -> SubscriptionName -> m ()
+subscribe
+  :: (MonadIO m, MonadReader Connection m) => Topic -> SubscriptionName -> m ()
 subscribe topic subs = do
   (Conn s) <- ask
   liftIO . print $ cmdSubscribe topic subs
   send s $ cmdSubscribe topic subs
   receive s
 
---producer :: (MonadIO m, MonadResource m) => Connection -> m ()
---producer (Conn s) = liftIO $ send s cmdProducer >> receive s
-
-runPulsar :: ResourceT IO Connection -> Pulsar a -> IO a
-runPulsar resConn (Pulsar m) = runResourceT $ do
-  conn <- resConn
-  liftIO $ runReaderT m conn
+runPulsar :: Connection -> Pulsar a -> IO a
+runPulsar conn (Pulsar m) = runReaderT m conn

@@ -1,3 +1,4 @@
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE LambdaCase, OverloadedStrings #-}
 
 module Pulsar.Internal.TCPClient
@@ -7,17 +8,17 @@ where
 
 import qualified Control.Exception             as E
 import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Resource
+import           Control.Monad.Managed
 import qualified Network.Socket                as NS
 
 acquireSocket
-  :: (MonadIO m, MonadResource m)
+  :: (MonadIO m, MonadManaged m)
   => NS.HostName
   -> NS.ServiceName
-  -> m (ReleaseKey, NS.Socket)
+  -> m NS.Socket
 acquireSocket host port = do
   addr <- liftIO resolve
-  allocate (open addr) NS.close
+  using $ managed (E.bracket (open addr) NS.close)
  where
   resolve = do
     let hints = NS.defaultHints { NS.addrSocketType = NS.Stream }

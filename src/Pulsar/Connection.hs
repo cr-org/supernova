@@ -3,7 +3,7 @@
 module Pulsar.Connection where
 
 import           Control.Monad.IO.Class
-import           Control.Monad.Trans.Resource
+import           Control.Monad.Managed
 import qualified Network.Socket                as NS
 import qualified Network.Socket.ByteString     as BS
 import           Proto.PulsarApi                ( BaseCommand )
@@ -21,9 +21,9 @@ data ConnectData = ConnData
 defaultConnectData :: ConnectData
 defaultConnectData = ConnData { connHost = "127.0.0.1", connPort = "6650" }
 
-connect :: (MonadIO m, MonadResource m) => ConnectData -> m Connection
+connect :: (MonadIO m, MonadManaged m) => ConnectData -> m Connection
 connect (ConnData h p) = do
-  (_, sock) <- acquireSocket h p
+  sock <- acquireSocket h p
   liftIO $ send sock cmdConnect
   liftIO $ putStrLn "<< Successfully connected to Apache Pulsar >>"
   return $ Conn sock
