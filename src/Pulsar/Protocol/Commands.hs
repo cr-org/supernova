@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Pulsar.Commands where
+module Pulsar.Protocol.Commands where
 
 import           Data.ProtoLens                 ( defMessage )
 import qualified Data.Text                     as T
@@ -55,12 +55,25 @@ closeProducer = defMessage
 send :: BaseCommand
 send = defMessage
     & F.type' .~ BaseCommand'SEND
-    & F.send .~ defMessage
+    & F.send .~ sendCmd
+ where
+  sendCmd :: CommandSend
+  sendCmd = defMessage
+    & F.numMessages .~ 1
 
 ping :: BaseCommand
 ping = defMessage
     & F.type' .~ BaseCommand'PING
     & F.ping .~ defMessage
+
+lookup :: Topic -> BaseCommand
+lookup topic = defMessage
+    & F.type' .~ BaseCommand'LOOKUP
+    & F.lookupTopic .~ lut
+  where
+   lut :: CommandLookupTopic
+   lut = defMessage
+     & F.topic .~ T.pack (show topic)
 
 ------- Metadata for Payload commands --------
 

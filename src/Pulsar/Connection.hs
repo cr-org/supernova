@@ -7,12 +7,12 @@ import           Control.Monad.Managed
 import qualified Network.Socket                as NS
 import qualified Network.Socket.ByteString     as BS
 import           Proto.PulsarApi                ( BaseCommand )
-import qualified Pulsar.Commands               as P
-import           Pulsar.Internal.Frame          ( Metadata
-                                                , Payload
-                                                , encodeBaseCommand
-                                                )
 import           Pulsar.Internal.TCPClient      ( acquireSocket )
+import qualified Pulsar.Protocol.Commands      as P
+import           Pulsar.Protocol.Encoder        ( encodeBaseCommand )
+import           Pulsar.Protocol.Frame          ( Metadata
+                                                , Payload
+                                                )
 
 newtype Connection = Conn NS.Socket
 

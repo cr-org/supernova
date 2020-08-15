@@ -5,11 +5,10 @@ version:             0.1.0.0
 synopsis:            Apache Pulsar client for Haskell
 -- description:
 -- bug-reports:
--- license:
 license:             Apache-2.0
 license-file:        LICENSE
 author:              Gabriel Volpe
-maintainer:          volpegabriel@gmail.com
+maintainer:          gabriel.volpe@chatroulette.com
 -- copyright:
 -- category:
 build-type:          Custom
@@ -27,12 +26,14 @@ library
   other-modules:       Paths_hpulsar
                      , Proto.PulsarApi
                      , Proto.PulsarApi_Fields
-                     , Pulsar.Commands
                      , Pulsar.Core
                      , Pulsar.Connection
                      , Pulsar.Internal.Core
-                     , Pulsar.Internal.Frame
                      , Pulsar.Internal.TCPClient
+                     , Pulsar.Protocol.Commands
+                     , Pulsar.Protocol.Decoder
+                     , Pulsar.Protocol.Encoder
+                     , Pulsar.Protocol.Frame
                      , Pulsar.Types
   autogen-modules:     Proto.PulsarApi
                      , Proto.PulsarApi_Fields

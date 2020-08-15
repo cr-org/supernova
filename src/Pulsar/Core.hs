@@ -6,10 +6,10 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Managed
 import           Control.Monad.Reader
 import           Data.IORef
-import qualified Pulsar.Commands               as P
 import           Pulsar.Connection
 import           Pulsar.Internal.Core
-import           Pulsar.Internal.Frame          ( Metadata(..)
+import qualified Pulsar.Protocol.Commands      as P
+import           Pulsar.Protocol.Frame          ( Metadata(..)
                                                 , Payload(..)
                                                 )
 import           Pulsar.Types
@@ -56,11 +56,18 @@ newSubscriber topic subs = do
   sendSimpleCmd s $ P.subscribe topic subs
   receive s
 
+lookup :: (MonadIO m, MonadReader PulsarCtx m) => Topic -> m ()
+lookup topic = do
+  (Ctx (Conn s) _) <- ask
+  liftIO . print $ P.lookup topic
+  sendSimpleCmd s $ P.lookup topic
+  receive s
+
 ------ Payload commands ------
 
 send :: (MonadIO m, MonadReader PulsarCtx m) => PulsarMessage -> m ()
 send (PulsarMessage msg) = do
   (Ctx (Conn s) _) <- ask
   liftIO . print $ P.send
-  sendPayloadCmd s P.send (Single P.singleMessageMetadata) (Just $ Payload msg)
+  sendPayloadCmd s P.send (Left P.singleMessageMetadata) (Just $ Payload msg)
   receive s
