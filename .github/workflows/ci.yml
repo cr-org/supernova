@@ -16,4 +16,4 @@ jobs:
         with:
           name: hpulsar
           signingKey: "${{ secrets.CACHIX_SIGNING_KEY }}"
-      - run: "nix-shell --run \"cabal new-build\""
+      - run: nix-build

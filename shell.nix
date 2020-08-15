@@ -1,17 +1,15 @@
-{ compiler ? "ghc883" }:
-
 let
-  pkgs = import ./pkgs.nix;
-  drv  = pkgs.haskell.packages.${compiler}.callCabal2nix "hpulsar" ./. {};
+  packages = import ./pkgs.nix {};
+  inherit (packages) pkgs hp;
 
-  inherit (pkgs) haskellPackages;
+  drv = hp.callCabal2nix "hpulsar" ./. {};
 in
   {
     my_project = drv;
-    shell = pkgs.haskell.packages.${compiler}.shellFor {
+    shell = hp.shellFor {
       name = "ghc-shell-for-hpulsar";
       packages = p: [drv];
-      buildInputs = with haskellPackages; [
+      buildInputs = with hp; [
         brittany
         cabal-install
         hlint
