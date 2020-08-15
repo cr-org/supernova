@@ -21,7 +21,24 @@ The example in `app/Main.hs` simply connects to a local Pulsar instance and emit
 cabal new-run
 ```
 
-You should see an output similar to the one below in the Pulsar logs.
+You should see an output similar to the one below.
+
+```
+<< Successfully connected to Apache Pulsar >>
+{type: PING ping { }}
+"Received: \NUL\NUL\NUL\RS\NUL\NUL\NUL\SUB\b\ETX\SUB\SYN\n\rPulsar Server\DLE\SI\CAN\128\128\192\STX"
+{type: LOOKUP lookupTopic { topic: "non-persistent://public/default/app" request_id: 0 }}
+"Received: \NUL\NUL\NUL\t\NUL\NUL\NUL\ENQ\b\DC3\154\SOH\NUL"
+{type: PRODUCER producer { topic: "non-persistent://public/default/app" producer_id: 0 request_id: 0 }}
+"Received: \NUL\NUL\NUL*\NUL\NUL\NUL&\b\CAN\194\SOH!\n\ETBpulsar://localhost:6650\CAN\SOH \NUL(\SOH@\SOH"
+{type: SEND send { producer_id: 0 sequence_id: 0 num_messages: 1 }}
+"Received: \NUL\NUL\NUL)\NUL\NUL\NUL%\b\DC1\138\SOH \b\NUL\DC2\SIstandalone-0-96\CAN\255\255\255\255\255\255\255\255\255\SOH\"\NUL"
+{type: CLOSE_PRODUCER close_producer { producer_id: 0 request_id: 0 }}
+"Received: \NUL\NUL\NUL\DC4\NUL\NUL\NUL\DLE\b\a:\f\b\NUL\DLE\NUL\SUB\EOT\b\NUL\DLE\NUL \NUL"
+<< Closing Pulsar connection >>
+```
+
+And something like this in the Pulsar logs.
 
 ```
 pulsar_1          | 09:56:20.387 [pulsar-io-50-1] INFO  org.apache.pulsar.broker.service.ServerCnx - New connection from /172.26.0.1:53836
