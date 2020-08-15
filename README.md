@@ -7,7 +7,11 @@ hpulsar
 
 ### Build
 
-Within a Nix shell (run `nix-shell` at the project's root).
+```shell
+nix-build
+```
+
+Or within a Nix shell (run `nix-shell` at the project's root).
 
 ```shell
 cabal new-build
