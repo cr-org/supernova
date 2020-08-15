@@ -6,7 +6,7 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Managed
 import qualified Network.Socket                as NS
 import qualified Network.Socket.ByteString.Lazy
-                                               as BSL
+                                               as SBL
 import           Proto.PulsarApi                ( BaseCommand )
 import           Pulsar.Internal.TCPClient      ( acquireSocket )
 import qualified Pulsar.Protocol.Commands      as P
@@ -40,16 +40,16 @@ connect (ConnData h p) = do
 
 sendSimpleCmd :: MonadIO m => NS.Socket -> BaseCommand -> m ()
 sendSimpleCmd s cmd =
-  liftIO . BSL.sendAll s $ encodeBaseCommand Nothing Nothing cmd
+  liftIO . SBL.sendAll s $ encodeBaseCommand Nothing Nothing cmd
 
 sendPayloadCmd
   :: MonadIO m => NS.Socket -> BaseCommand -> Metadata -> Maybe Payload -> m ()
 sendPayloadCmd s cmd meta payload =
-  liftIO . BSL.sendAll s $ encodeBaseCommand (Just meta) payload cmd
+  liftIO . SBL.sendAll s $ encodeBaseCommand (Just meta) payload cmd
 
 receive :: MonadIO m => NS.Socket -> m BaseCommand
 receive s = liftIO $ do
-  msg <- BSL.recv s (fromIntegral maxFrameSize)
+  msg <- SBL.recv s (fromIntegral maxFrameSize)
   case decodeBaseCommand msg of
     Left  e        -> fail e
     Right (cmd, _) -> return cmd

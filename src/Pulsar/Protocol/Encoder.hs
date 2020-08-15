@@ -5,16 +5,13 @@ module Pulsar.Protocol.Encoder
   )
 where
 
-import qualified Data.Binary                   as B
 import qualified Data.Binary.Put               as B
 import qualified Data.ByteString.Lazy          as BL
-import qualified Data.ByteString.Char8         as C
 import qualified Data.ByteString.Lazy.Char8    as CL
 import           Data.Digest.CRC32C             ( crc32c )
 import           Data.Int                       ( Int32 )
 import           Data.Maybe                     ( fromMaybe )
 import qualified Data.ProtoLens.Encoding       as PL
-import qualified Data.ProtoLens.Encoding.Bytes as PL
 import           Proto.PulsarApi                ( BaseCommand )
 import           Pulsar.Protocol.Frame
 
@@ -34,7 +31,7 @@ mkPayloadCommand cmd meta (Payload pl) = (simpleCmd, payloadCmd)
  where
   -- payload fields
   metadata    = either PL.encodeMessage PL.encodeMessage meta
-  metaSize    = fromIntegral . C.length $ metadata
+  metaSize    = fromIntegral . CL.length . CL.fromStrict $ metadata
   metaSizeBS  = B.runPut . B.putInt32be $ metaSize
   checksum    = crc32c $ CL.toStrict metaSizeBS <> metadata <> CL.toStrict pl
   payloadSize = fromIntegral . CL.length $ pl
