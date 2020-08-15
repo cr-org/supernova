@@ -1,6 +1,8 @@
 hpulsar
 =======
 
+[![CI Status](https://github.com/cr-org/hpulsar/workflows/Haskell%20CI/badge.svg)](https://github.com/cr-org/hpulsar/actions)
+
 [Apache Pulsar](https://pulsar.apache.org/) client for Haskell.
 
 ### Build
