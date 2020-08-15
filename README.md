@@ -7,6 +7,8 @@ hpulsar
 
 ### Build
 
+It is recommended to use [Cachix](https://app.cachix.org/cache/hpulsar) to reduce the compilation time.
+
 ```shell
 nix-build
 ```
