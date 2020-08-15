@@ -30,18 +30,19 @@ cabal new-run
 You should see an output similar to the one below.
 
 ```
-<< Successfully connected to Apache Pulsar >>
-{type: PING ping { }}
-"Received: \NUL\NUL\NUL\RS\NUL\NUL\NUL\SUB\b\ETX\SUB\SYN\n\rPulsar Server\DLE\SI\CAN\128\128\192\STX"
-{type: LOOKUP lookupTopic { topic: "non-persistent://public/default/app" request_id: 0 }}
-"Received: \NUL\NUL\NUL\t\NUL\NUL\NUL\ENQ\b\DC3\154\SOH\NUL"
-{type: PRODUCER producer { topic: "non-persistent://public/default/app" producer_id: 0 request_id: 0 }}
-"Received: \NUL\NUL\NUL*\NUL\NUL\NUL&\b\CAN\194\SOH!\n\ETBpulsar://localhost:6650\CAN\SOH \NUL(\SOH@\SOH"
-{type: SEND send { producer_id: 0 sequence_id: 0 num_messages: 1 }}
-"Received: \NUL\NUL\NUL)\NUL\NUL\NUL%\b\DC1\138\SOH \b\NUL\DC2\SIstandalone-0-96\CAN\255\255\255\255\255\255\255\255\255\SOH\"\NUL"
-{type: CLOSE_PRODUCER close_producer { producer_id: 0 request_id: 0 }}
-"Received: \NUL\NUL\NUL\DC4\NUL\NUL\NUL\DLE\b\a:\f\b\NUL\DLE\NUL\SUB\EOT\b\NUL\DLE\NUL \NUL"
-<< Closing Pulsar connection >>
+[ Establishing connection with Pulsar ]
+<<< {server_version: "Pulsar Server" protocol_version: 15 max_message_size: 5242880}
+>>> {type: PING ping { }}
+<<< {type: PONG pong { }}
+>>> {type: LOOKUP lookupTopic { topic: "non-persistent://public/default/app" request_id: 0 }}
+<<< {type: LOOKUP_RESPONSE lookupTopicResponse { brokerServiceUrl: "pulsar://localhost:6650" response: Connect request_id: 0 authoritative: true proxy_through_service_url: true }}
+>>> {type: PRODUCER producer { topic: "non-persistent://public/default/app" producer_id: 0 request_id: 0 }}
+<<< {type: PRODUCER_SUCCESS producer_success { request_id: 0 producer_name: "standalone-1-26" last_sequence_id: -1 schema_version: "" }}
+>>> {type: SEND send { producer_id: 0 sequence_id: 0 num_messages: 1 }}
+<<< {type: SEND_RECEIPT send_receipt { producer_id: 0 sequence_id: 0 message_id { ledgerId: 0 entryId: 0 } highest_sequence_id: 0 }}
+>>> {type: CLOSE_PRODUCER close_producer { producer_id: 0 request_id: 0 }}
+<<< {type: SUCCESS success { request_id: 0 }}
+[ Closing Pulsar connection ]
 ```
 
 And something like this in the Pulsar logs.

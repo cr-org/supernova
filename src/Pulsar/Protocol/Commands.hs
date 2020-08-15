@@ -79,3 +79,8 @@ lookup topic = defMessage
 
 singleMessageMetadata :: SingleMessageMetadata
 singleMessageMetadata = defMessage
+
+------- Responses --------
+
+isConnected :: BaseCommand -> Maybe CommandConnected
+isConnected = view F.maybe'connected

@@ -25,49 +25,61 @@ runPulsar conn (Pulsar m) = do
   producers <- newIORef []
   runReaderT m (Ctx conn producers)
 
+logRequest :: (MonadIO m, Show a) => a -> m ()
+logRequest cmd = liftIO . putStrLn $ ">>> " <> show cmd
+
+logResponse :: (MonadIO m, Show a) => a -> m ()
+logResponse cmd = liftIO . putStrLn $ "<<< " <> show cmd
+
 ------ Simple commands ------
 
 ping :: (MonadIO m, MonadReader PulsarCtx m) => m ()
 ping = do
   (Ctx (Conn s) _) <- ask
-  liftIO . print $ P.ping
+  logRequest P.ping
   sendSimpleCmd s P.ping
-  receive s
+  resp <- receive s
+  logResponse resp
+
+lookup :: (MonadIO m, MonadReader PulsarCtx m) => Topic -> m ()
+lookup topic = do
+  (Ctx (Conn s) _) <- ask
+  logRequest $ P.lookup topic
+  sendSimpleCmd s $ P.lookup topic
+  resp <- receive s
+  logResponse resp
 
 newProducer :: (MonadIO m, MonadReader PulsarCtx m) => Topic -> m ()
 newProducer topic = do
   (Ctx (Conn s) _) <- ask
-  liftIO . print $ P.producer topic
+  logRequest $ P.producer topic
   sendSimpleCmd s $ P.producer topic
-  receive s
+  resp <- receive s
+  logResponse resp
 
 closeProducer :: (MonadIO m, MonadReader PulsarCtx m) => m ()
 closeProducer = do
   (Ctx (Conn s) _) <- ask
-  liftIO . print $ P.closeProducer
+  logRequest $ P.closeProducer
   sendSimpleCmd s P.closeProducer
-  receive s
+  resp <- receive s
+  logResponse resp
 
 newSubscriber
   :: (MonadIO m, MonadReader PulsarCtx m) => Topic -> SubscriptionName -> m ()
 newSubscriber topic subs = do
   (Ctx (Conn s) _) <- ask
-  liftIO . print $ P.subscribe topic subs
+  logRequest $ P.subscribe topic subs
   sendSimpleCmd s $ P.subscribe topic subs
-  receive s
-
-lookup :: (MonadIO m, MonadReader PulsarCtx m) => Topic -> m ()
-lookup topic = do
-  (Ctx (Conn s) _) <- ask
-  liftIO . print $ P.lookup topic
-  sendSimpleCmd s $ P.lookup topic
-  receive s
+  resp <- receive s
+  logResponse resp
 
 ------ Payload commands ------
 
 send :: (MonadIO m, MonadReader PulsarCtx m) => PulsarMessage -> m ()
 send (PulsarMessage msg) = do
   (Ctx (Conn s) _) <- ask
-  liftIO . print $ P.send
+  logRequest P.send
   sendPayloadCmd s P.send (Left P.singleMessageMetadata) (Just $ Payload msg)
-  receive s
+  resp <- receive s
+  logResponse resp

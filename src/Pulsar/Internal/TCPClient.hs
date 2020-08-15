@@ -1,4 +1,3 @@
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE LambdaCase, OverloadedStrings #-}
 
 module Pulsar.Internal.TCPClient
@@ -17,8 +16,8 @@ acquireSocket host port = do
   addr <- liftIO resolve
   using $ managed
     (E.bracket
-      (open addr)
-      (\s -> putStrLn "<< Closing Pulsar connection >>" >> NS.close s)
+      (putStrLn "[ Establishing connection with Pulsar ]" >> open addr)
+      (\s -> putStrLn "[ Closing Pulsar connection ]" >> NS.close s)
     )
  where
   resolve = do

@@ -1,5 +1,3 @@
-{-# LANGUAGE OverloadedStrings #-}
-
 module Pulsar.Protocol.Frame where
 
 import qualified Data.Binary                   as B
@@ -14,7 +12,7 @@ import           Proto.PulsarApi                ( SingleMessageMetadata
  -
  - http://pulsar.apache.org/docs/en/develop-binary-protocol/#framing
  -}
---maxFrameSize = 5 * 1024 * 1024 -- 5mb
+maxFrameSize = 5 * 1024 * 1024 -- 5mb
 
 data Frame = SimpleFrame SimpleCmd | PayloadFrame SimpleCmd PayloadCmd
 
@@ -27,11 +25,11 @@ data SimpleCmd = SimpleCommand
 
 -- Payload command: http://pulsar.apache.org/docs/en/develop-binary-protocol/#payload-commands
 data PayloadCmd = PayloadCommand
-  { frameMagicNumber :: B.Word16        -- A 2-byte byte array (0x0e01) identifying the current format
-  , frameCheckSum :: B.Word32           -- A CRC32-C checksum of everything that comes after it (4 bytes)
-  , frameMetadataSize :: CL.ByteString  -- The size of the message metadata (4 bytes)
-  , frameMetadata :: CL.ByteString      -- The message metadata stored as a binary protobuf message
-  , framePayload :: CL.ByteString       -- Anything left in the frame is considered the payload and can include any sequence of bytes
+  { frameMagicNumber :: B.Word16    -- A 2-byte byte array (0x0e01) identifying the current format
+  , frameCheckSum :: B.Word32       -- A CRC32-C checksum of everything that comes after it (4 bytes)
+  , frameMetadataSize :: Int32      -- The size of the message metadata (4 bytes)
+  , frameMetadata :: CL.ByteString  -- The message metadata stored as a binary protobuf message
+  , framePayload :: CL.ByteString   -- Anything left in the frame is considered the payload and can include any sequence of bytes
   }
 
 type Metadata = Either SingleMessageMetadata MessageMetadata
