@@ -4,7 +4,6 @@ import qualified Data.Binary                   as B
 import qualified Data.ByteString.Lazy.Char8    as CL
 import           Data.Int                       ( Int32 )
 import           Proto.PulsarApi                ( BaseCommand
-                                                , SingleMessageMetadata
                                                 , MessageMetadata
                                                 )
 
@@ -33,8 +32,6 @@ data PayloadCmd = PayloadCommand
   , framePayload :: CL.ByteString   -- Anything left in the frame is considered the payload and can include any sequence of bytes
   }
 
-type Metadata = Either SingleMessageMetadata MessageMetadata
-
 newtype Payload = Payload CL.ByteString deriving Show
 
-data Response = SimpleResponse BaseCommand | PayloadResponse BaseCommand Metadata (Maybe Payload) deriving Show
+data Response = SimpleResponse BaseCommand | PayloadResponse BaseCommand MessageMetadata (Maybe Payload) deriving Show

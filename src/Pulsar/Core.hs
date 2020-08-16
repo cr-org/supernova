@@ -6,12 +6,11 @@ import           Control.Monad.IO.Class
 import           Control.Monad.Managed
 import           Control.Monad.Reader
 import           Data.IORef
+import           Proto.PulsarApi
 import           Pulsar.Connection
 import           Pulsar.Internal.Core
 import qualified Pulsar.Protocol.Commands      as P
-import           Pulsar.Protocol.Frame          ( Metadata(..)
-                                                , Payload(..)
-                                                )
+import           Pulsar.Protocol.Frame          ( Payload(..) )
 import           Pulsar.Types
 
 class Monad m => MonadPulsar m where
@@ -74,6 +73,23 @@ newSubscriber topic subs = do
   resp <- receive s
   logResponse resp
 
+flow :: (MonadIO m, MonadReader PulsarCtx m) => m (Maybe MessageIdData)
+flow = do
+  (Ctx (Conn s) _) <- ask
+  logRequest P.flow
+  sendSimpleCmd s P.flow
+  resp <- receive s
+  logResponse resp
+  return $ P.getMessageId (getCommand resp)
+
+ack :: (MonadIO m, MonadReader PulsarCtx m) => MessageIdData -> m ()
+ack msgId = do
+  (Ctx (Conn s) _) <- ask
+  logRequest $ P.ack msgId
+  sendSimpleCmd s $ P.ack msgId
+  resp <- receive s
+  logResponse resp
+
 closeConsumer :: (MonadIO m, MonadReader PulsarCtx m) => m ()
 closeConsumer = do
   (Ctx (Conn s) _) <- ask
@@ -88,6 +104,6 @@ send :: (MonadIO m, MonadReader PulsarCtx m) => PulsarMessage -> m ()
 send (PulsarMessage msg) = do
   (Ctx (Conn s) _) <- ask
   logRequest P.send
-  sendPayloadCmd s P.send (Left P.singleMessageMetadata) (Just $ Payload msg)
+  sendPayloadCmd s P.send P.messageMetadata (Just $ Payload msg)
   resp <- receive s
   logResponse resp

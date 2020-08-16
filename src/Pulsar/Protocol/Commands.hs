@@ -31,6 +31,24 @@ subscribe topic (SubscriptionName sub) = defMessage
     & F.subscription .~ sub
     & F.subType .~ CommandSubscribe'Shared
 
+flow :: BaseCommand
+flow = defMessage
+    & F.type' .~ BaseCommand'FLOW
+    & F.flow .~ flowCmd
+ where
+  flowCmd :: CommandFlow
+  flowCmd = defMessage
+    & F.messagePermits .~ 1
+
+ack :: MessageIdData -> BaseCommand
+ack msgId = defMessage
+    & F.type' .~ BaseCommand'ACK
+    & F.ack .~ ackCmd
+ where
+  ackCmd :: CommandAck
+  ackCmd = defMessage
+    & F.messageId .~ [ msgId ]
+
 -- TODO: should take consumer id
 closeConsumer :: BaseCommand
 closeConsumer = defMessage
@@ -83,10 +101,13 @@ lookup topic = defMessage
 
 ------- Metadata for Payload commands --------
 
-singleMessageMetadata :: SingleMessageMetadata
-singleMessageMetadata = defMessage
+messageMetadata :: MessageMetadata
+messageMetadata = defMessage
 
 ------- Responses --------
 
 getConnected :: BaseCommand -> Maybe CommandConnected
 getConnected = view F.maybe'connected
+
+getMessageId :: BaseCommand -> Maybe MessageIdData
+getMessageId = (view F.messageId <$>) . view F.maybe'message

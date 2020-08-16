@@ -7,13 +7,15 @@ where
 
 import qualified Data.Binary.Put               as B
 import qualified Data.ByteString.Lazy          as BL
-import qualified Data.ByteString.Char8    as C
+import qualified Data.ByteString.Char8         as C
 import qualified Data.ByteString.Lazy.Char8    as CL
 import           Data.Digest.CRC32C             ( crc32c )
 import           Data.Int                       ( Int32 )
 import           Data.Maybe                     ( fromMaybe )
 import qualified Data.ProtoLens.Encoding       as PL
-import           Proto.PulsarApi                ( BaseCommand )
+import           Proto.PulsarApi                ( BaseCommand
+                                                , MessageMetadata
+                                                )
 import           Pulsar.Protocol.Frame
 
 mkSimpleCommand :: Int32 -> BaseCommand -> SimpleCmd
@@ -27,11 +29,11 @@ mkSimpleCommand extraBytes cmd = SimpleCommand
   cmdSize = fromIntegral $ CL.length msg
 
 mkPayloadCommand
-  :: BaseCommand -> Metadata -> Payload -> (SimpleCmd, PayloadCmd)
+  :: BaseCommand -> MessageMetadata -> Payload -> (SimpleCmd, PayloadCmd)
 mkPayloadCommand cmd meta (Payload pl) = (simpleCmd, payloadCmd)
  where
   -- payload fields
-  metadata    = either PL.encodeMessage PL.encodeMessage meta
+  metadata    = PL.encodeMessage meta
   metaSize    = fromIntegral . CL.length . CL.fromStrict $ metadata
   metaSizeBS  = B.runPut . B.putInt32be $ metaSize
   checksum    = crc32c $ CL.toStrict metaSizeBS <> metadata <> CL.toStrict pl
@@ -56,13 +58,13 @@ encodeFrame (SimpleFrame scmd) = encodeSimpleCmd scmd
 encodeFrame (PayloadFrame scmd (PayloadCommand cs mds md p)) =
   let simpleCmd   = encodeSimpleCmd scmd
       metaSizeBS  = B.runPut . B.putInt32be $ mds
-      magicNumber = B.runPut $ B.putWord16be frameMagicNumber
-      crc32cSum   = B.runPut $ B.putWord32be cs
+      magicNumber = B.runPut . B.putWord16be $ frameMagicNumber
+      crc32cSum   = B.runPut . B.putWord32be $ cs
       payloadCmd  = magicNumber <> crc32cSum <> metaSizeBS <> md <> p
   in  simpleCmd <> payloadCmd
 
 encodeBaseCommand
-  :: Maybe Metadata -> Maybe Payload -> BaseCommand -> CL.ByteString
+  :: Maybe MessageMetadata -> Maybe Payload -> BaseCommand -> CL.ByteString
 encodeBaseCommand (Just meta) p cmd =
   let pl = fromMaybe (Payload "") p
   in  encodeFrame . uncurry PayloadFrame $ mkPayloadCommand cmd meta pl

@@ -36,12 +36,22 @@ You should see an output similar to the one below.
 <<< SimpleResponse {type: PONG pong { }}
 >>> {type: LOOKUP lookupTopic { topic: "non-persistent://public/default/app" request_id: 0 }}
 <<< SimpleResponse {type: LOOKUP_RESPONSE lookupTopicResponse { brokerServiceUrl: "pulsar://localhost:6650" response: Connect request_id: 0 authoritative: true proxy_through_service_url: true }}
+>>> {type: SUBSCRIBE subscribe { topic: "non-persistent://public/default/app" subscription: "test-sub" subType: Shared consumer_id: 0 request_id: 0 }}
+<<< SimpleResponse {type: SUCCESS success { request_id: 0 }}
+>>> {type: LOOKUP lookupTopic { topic: "non-persistent://public/default/app" request_id: 0 }}
+<<< SimpleResponse {type: LOOKUP_RESPONSE lookupTopicResponse { brokerServiceUrl: "pulsar://localhost:6650" response: Connect request_id: 0 authoritative: true proxy_through_service_url: true }}
 >>> {type: PRODUCER producer { topic: "non-persistent://public/default/app" producer_id: 0 request_id: 0 }}
-<<< SimpleResponse {type: PRODUCER_SUCCESS producer_success { request_id: 0 producer_name: "standalone-2-83" last_sequence_id: -1 schema_version: "" }}
+<<< SimpleResponse {type: PRODUCER_SUCCESS producer_success { request_id: 0 producer_name: "standalone-3-83" last_sequence_id: -1 schema_version: "" }}
+>>> {type: FLOW flow { consumer_id: 0 messagePermits: 1 }}
 >>> {type: SEND send { producer_id: 0 sequence_id: 0 num_messages: 1 }}
-<<< SimpleResponse {type: SEND_RECEIPT send_receipt { producer_id: 0 sequence_id: 0 message_id { ledgerId: 0 entryId: 0 } highest_sequence_id: 0 }}
+<<< SimpleResponse {type: SEND_RECEIPT send_receipt { producer_id: 0 sequence_id: 0 message_id { ledgerId: 0 entryId: 0 } highest_sequence_id: 18446744073709551615 }}
+<<< PayloadResponse {type: MESSAGE message { consumer_id: 0 message_id { ledgerId: 0 entryId: 0 partition: -1 } }} {producer_name: "" sequence_id: 0 publish_time: 0} (Just (Payload "foo"))
+>>> {type: ACK ack { consumer_id: 0 ack_type: Individual message_id { ledgerId: 0 entryId: 0 partition: -1 } }}
+>>> {type: CLOSE_CONSUMER close_consumer { consumer_id: 0 request_id: 0 }}
+<<< SimpleResponse {type: SUCCESS success { request_id: 0 }}
 >>> {type: CLOSE_PRODUCER close_producer { producer_id: 0 request_id: 0 }}
 <<< SimpleResponse {type: SUCCESS success { request_id: 0 }}
+<<< SimpleResponse {type: PING ping { }}
 [ Closing Pulsar connection ]
 ```
 
