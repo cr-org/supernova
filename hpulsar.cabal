@@ -38,6 +38,7 @@ library
   autogen-modules:     Proto.PulsarApi
                      , Proto.PulsarApi_Fields
   build-depends:       base
+                     , bifunctor
                      , binary
                      , bytestring
                      , crc32c

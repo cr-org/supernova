@@ -7,6 +7,7 @@ where
 
 import qualified Data.Binary.Put               as B
 import qualified Data.ByteString.Lazy          as BL
+import qualified Data.ByteString.Char8    as C
 import qualified Data.ByteString.Lazy.Char8    as CL
 import           Data.Digest.CRC32C             ( crc32c )
 import           Data.Int                       ( Int32 )
@@ -38,8 +39,7 @@ mkPayloadCommand cmd meta (Payload pl) = (simpleCmd, payloadCmd)
   -- frame: extra 14 bytes = 2 (magic number) + 4 (checksum) + 4 (metadata size) + 4 (command size)
   extraBytes  = fromIntegral (14 + metaSize) + payloadSize
   simpleCmd   = mkSimpleCommand extraBytes cmd
-  payloadCmd  = PayloadCommand { frameMagicNumber  = 0x0e01
-                               , frameCheckSum     = checksum
+  payloadCmd  = PayloadCommand { frameCheckSum     = checksum
                                , frameMetadataSize = metaSize
                                , frameMetadata     = CL.fromStrict metadata
                                , framePayload      = pl
@@ -53,10 +53,10 @@ encodeSimpleCmd (SimpleCommand ts cs msg) =
 
 encodeFrame :: Frame -> CL.ByteString
 encodeFrame (SimpleFrame scmd) = encodeSimpleCmd scmd
-encodeFrame (PayloadFrame scmd (PayloadCommand mn cs mds md p)) =
+encodeFrame (PayloadFrame scmd (PayloadCommand cs mds md p)) =
   let simpleCmd   = encodeSimpleCmd scmd
       metaSizeBS  = B.runPut . B.putInt32be $ mds
-      magicNumber = B.runPut $ B.putWord16be mn
+      magicNumber = B.runPut $ B.putWord16be frameMagicNumber
       crc32cSum   = B.runPut $ B.putWord32be cs
       payloadCmd  = magicNumber <> crc32cSum <> metaSizeBS <> md <> p
   in  simpleCmd <> payloadCmd

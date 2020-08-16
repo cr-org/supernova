@@ -33,15 +33,15 @@ You should see an output similar to the one below.
 [ Establishing connection with Pulsar ]
 <<< {server_version: "Pulsar Server" protocol_version: 15 max_message_size: 5242880}
 >>> {type: PING ping { }}
-<<< {type: PONG pong { }}
+<<< SimpleResponse {type: PONG pong { }}
 >>> {type: LOOKUP lookupTopic { topic: "non-persistent://public/default/app" request_id: 0 }}
-<<< {type: LOOKUP_RESPONSE lookupTopicResponse { brokerServiceUrl: "pulsar://localhost:6650" response: Connect request_id: 0 authoritative: true proxy_through_service_url: true }}
+<<< SimpleResponse {type: LOOKUP_RESPONSE lookupTopicResponse { brokerServiceUrl: "pulsar://localhost:6650" response: Connect request_id: 0 authoritative: true proxy_through_service_url: true }}
 >>> {type: PRODUCER producer { topic: "non-persistent://public/default/app" producer_id: 0 request_id: 0 }}
-<<< {type: PRODUCER_SUCCESS producer_success { request_id: 0 producer_name: "standalone-1-26" last_sequence_id: -1 schema_version: "" }}
+<<< SimpleResponse {type: PRODUCER_SUCCESS producer_success { request_id: 0 producer_name: "standalone-2-83" last_sequence_id: -1 schema_version: "" }}
 >>> {type: SEND send { producer_id: 0 sequence_id: 0 num_messages: 1 }}
-<<< {type: SEND_RECEIPT send_receipt { producer_id: 0 sequence_id: 0 message_id { ledgerId: 0 entryId: 0 } highest_sequence_id: 0 }}
+<<< SimpleResponse {type: SEND_RECEIPT send_receipt { producer_id: 0 sequence_id: 0 message_id { ledgerId: 0 entryId: 0 } highest_sequence_id: 0 }}
 >>> {type: CLOSE_PRODUCER close_producer { producer_id: 0 request_id: 0 }}
-<<< {type: SUCCESS success { request_id: 0 }}
+<<< SimpleResponse {type: SUCCESS success { request_id: 0 }}
 [ Closing Pulsar connection ]
 ```
 

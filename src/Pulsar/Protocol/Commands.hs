@@ -82,5 +82,5 @@ singleMessageMetadata = defMessage
 
 ------- Responses --------
 
-isConnected :: BaseCommand -> Maybe CommandConnected
-isConnected = view F.maybe'connected
+getConnected :: BaseCommand -> Maybe CommandConnected
+getConnected = view F.maybe'connected

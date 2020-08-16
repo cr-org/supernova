@@ -60,7 +60,7 @@ newProducer topic = do
 closeProducer :: (MonadIO m, MonadReader PulsarCtx m) => m ()
 closeProducer = do
   (Ctx (Conn s) _) <- ask
-  logRequest $ P.closeProducer
+  logRequest P.closeProducer
   sendSimpleCmd s P.closeProducer
   resp <- receive s
   logResponse resp

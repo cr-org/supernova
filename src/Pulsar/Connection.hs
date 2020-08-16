@@ -14,7 +14,8 @@ import           Pulsar.Protocol.Decoder        ( decodeBaseCommand )
 import           Pulsar.Protocol.Encoder        ( encodeBaseCommand )
 import           Pulsar.Protocol.Frame          ( Metadata
                                                 , Payload
-                                                , maxFrameSize
+                                                , Response(..)
+                                                , frameMaxSize
                                                 )
 
 newtype Connection = Conn NS.Socket
@@ -27,13 +28,19 @@ data ConnectData = ConnData
 defaultConnectData :: ConnectData
 defaultConnectData = ConnData { connHost = "127.0.0.1", connPort = "6650" }
 
+-- Could be a lens but not worth it for now
+getCommand :: Response -> BaseCommand
+getCommand response = case response of
+  (SimpleResponse cmd     ) -> cmd
+  (PayloadResponse cmd _ _) -> cmd
+
 connect
   :: (MonadFail m, MonadIO m, MonadManaged m) => ConnectData -> m Connection
 connect (ConnData h p) = do
   sock <- acquireSocket h p
   liftIO $ sendSimpleCmd sock P.connect
-  response <- receive sock
-  case P.isConnected response of
+  resp <- receive sock
+  case P.getConnected (getCommand resp) of
     Just res -> liftIO . putStrLn $ "<<< " <> show res
     Nothing  -> fail "Could not connect"
   return $ Conn sock
@@ -47,9 +54,9 @@ sendPayloadCmd
 sendPayloadCmd s cmd meta payload =
   liftIO . SBL.sendAll s $ encodeBaseCommand (Just meta) payload cmd
 
-receive :: MonadIO m => NS.Socket -> m BaseCommand
+receive :: MonadIO m => NS.Socket -> m Response
 receive s = liftIO $ do
-  msg <- SBL.recv s (fromIntegral maxFrameSize)
+  msg <- SBL.recv s (fromIntegral frameMaxSize)
   case decodeBaseCommand msg of
-    Left  e        -> fail e
-    Right (cmd, _) -> return cmd
+    Left  e    -> fail $ "Decoding error: " <> e
+    Right resp -> return resp
