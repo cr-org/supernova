@@ -3,7 +3,7 @@ module Pulsar.Types where
 import qualified Data.ByteString.Lazy.Char8    as CL
 import           Data.Char                      ( toLower )
 import           Data.String
-import           Data.Text                      ( Text )
+import qualified Data.Text                     as T
 
 ------- Topic ---------
 
@@ -53,4 +53,7 @@ instance IsString PulsarMessage where
 
 ------- Subscription ---------
 
-newtype SubscriptionName = SubscriptionName Text deriving Show
+newtype SubscriptionName = SubscriptionName T.Text deriving Show
+
+instance IsString SubscriptionName where
+  fromString = SubscriptionName . T.pack

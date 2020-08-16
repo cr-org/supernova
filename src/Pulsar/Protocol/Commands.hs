@@ -31,6 +31,12 @@ subscribe topic (SubscriptionName sub) = defMessage
     & F.subscription .~ sub
     & F.subType .~ CommandSubscribe'Shared
 
+-- TODO: should take consumer id
+closeConsumer :: BaseCommand
+closeConsumer = defMessage
+    & F.type' .~ BaseCommand'CLOSE_CONSUMER
+    & F.closeConsumer .~ defMessage
+
 producer :: Topic -> BaseCommand
 producer topic = defMessage
     & F.type' .~ BaseCommand'PRODUCER

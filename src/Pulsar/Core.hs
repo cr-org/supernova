@@ -74,6 +74,14 @@ newSubscriber topic subs = do
   resp <- receive s
   logResponse resp
 
+closeConsumer :: (MonadIO m, MonadReader PulsarCtx m) => m ()
+closeConsumer = do
+  (Ctx (Conn s) _) <- ask
+  logRequest P.closeConsumer
+  sendSimpleCmd s P.closeConsumer
+  resp <- receive s
+  logResponse resp
+
 ------ Payload commands ------
 
 send :: (MonadIO m, MonadReader PulsarCtx m) => PulsarMessage -> m ()
