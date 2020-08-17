@@ -2,6 +2,7 @@
 
 module Pulsar.Protocol.Commands where
 
+import qualified Data.Binary                   as B
 import           Data.ProtoLens                 ( defMessage )
 import qualified Data.Text                     as T
 import           Data.Version                   ( showVersion )
@@ -20,8 +21,8 @@ connect = defMessage
     & F.clientVersion .~ "Pulsar-Client-Haskell-v" <> T.pack (showVersion version)
     & F.protocolVersion .~ 15
 
-subscribe :: Topic -> SubscriptionName -> BaseCommand
-subscribe topic (SubscriptionName sub) = defMessage
+subscribe :: B.Word64 -> Topic -> SubscriptionName -> BaseCommand
+subscribe cid topic (SubscriptionName sub) = defMessage
     & F.type' .~ BaseCommand'SUBSCRIBE
     & F.subscribe .~ subs
  where
@@ -30,60 +31,65 @@ subscribe topic (SubscriptionName sub) = defMessage
     & F.topic .~ T.pack (show topic)
     & F.subscription .~ sub
     & F.subType .~ CommandSubscribe'Shared
+    & F.consumerId .~ cid
 
-flow :: BaseCommand
-flow = defMessage
+flow :: B.Word64 -> BaseCommand
+flow cid = defMessage
     & F.type' .~ BaseCommand'FLOW
     & F.flow .~ flowCmd
  where
   flowCmd :: CommandFlow
   flowCmd = defMessage
-    & F.messagePermits .~ 1
+    & F.messagePermits .~ 100
+    & F.consumerId .~ cid
 
-ack :: MessageIdData -> BaseCommand
-ack msgId = defMessage
+ack :: B.Word64 -> MessageIdData -> BaseCommand
+ack cid msgId = defMessage
     & F.type' .~ BaseCommand'ACK
     & F.ack .~ ackCmd
  where
   ackCmd :: CommandAck
   ackCmd = defMessage
     & F.messageId .~ [ msgId ]
+    & F.consumerId .~ cid
 
--- TODO: should take consumer id
-closeConsumer :: BaseCommand
-closeConsumer = defMessage
+closeConsumer :: B.Word64 -> BaseCommand
+closeConsumer cid = defMessage
     & F.type' .~ BaseCommand'CLOSE_CONSUMER
-    & F.closeConsumer .~ defMessage
+    & F.closeConsumer .~ close
+ where
+  close :: CommandCloseConsumer
+  close = defMessage
+    & F.consumerId .~ cid
 
-producer :: Topic -> BaseCommand
-producer topic = defMessage
+producer :: B.Word64 -> Topic -> BaseCommand
+producer pid topic = defMessage
     & F.type' .~ BaseCommand'PRODUCER
     & F.producer .~ prod
  where
   prod :: CommandProducer
   prod = defMessage
     & F.topic .~ T.pack (show topic)
-    & F.producerId .~ 0
-    & F.requestId .~ 0
+    & F.producerId .~ pid
 
-closeProducer :: BaseCommand
-closeProducer = defMessage
+closeProducer :: B.Word64 -> BaseCommand
+closeProducer pid = defMessage
     & F.type' .~ BaseCommand'CLOSE_PRODUCER
     & F.closeProducer .~ prod
  where
   prod :: CommandCloseProducer
   prod = defMessage
-    & F.producerId .~ 0
-    & F.requestId .~ 0
+    & F.producerId .~ pid
 
-send :: BaseCommand
-send = defMessage
+send :: B.Word64 -> BaseCommand
+send pid = defMessage
     & F.type' .~ BaseCommand'SEND
     & F.send .~ sendCmd
  where
   sendCmd :: CommandSend
   sendCmd = defMessage
     & F.numMessages .~ 1
+    & F.producerId .~ pid
 
 ping :: BaseCommand
 ping = defMessage
@@ -108,6 +114,3 @@ messageMetadata = defMessage
 
 getConnected :: BaseCommand -> Maybe CommandConnected
 getConnected = view F.maybe'connected
-
-getMessageId :: BaseCommand -> Maybe MessageIdData
-getMessageId = (view F.messageId <$>) . view F.maybe'message

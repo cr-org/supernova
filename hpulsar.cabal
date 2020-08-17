@@ -23,6 +23,8 @@ custom-setup
 
 library
   exposed-modules:     Pulsar
+                     , Pulsar.Consumer
+                     , Pulsar.Producer
   other-modules:       Paths_hpulsar
                      , Proto.PulsarApi
                      , Proto.PulsarApi_Fields
@@ -42,6 +44,7 @@ library
                      , binary
                      , bytestring
                      , crc32c
+                     , exceptions
                      , lens-family-core
                      , managed
                      , mtl
@@ -49,12 +52,15 @@ library
                      , proto-lens
                      , proto-lens-runtime
                      , text
+                     , unliftio
+                     , unliftio-core
   hs-source-dirs:      src
   default-language:    Haskell2010
 
 executable hpulsar
   main-is:             Main.hs
   build-depends:       base
+                     , async
                      , hpulsar
                      , managed
   hs-source-dirs:      app

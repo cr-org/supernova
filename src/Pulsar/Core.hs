@@ -1,28 +1,14 @@
-{-# LANGUAGE FlexibleContexts #-}
-
 module Pulsar.Core where
 
 import           Control.Monad.IO.Class
-import           Control.Monad.Managed
-import           Control.Monad.Reader
-import           Data.IORef
+import qualified Data.Binary                   as B
+import           Lens.Family
 import           Proto.PulsarApi
+import qualified Proto.PulsarApi_Fields        as F
 import           Pulsar.Connection
-import           Pulsar.Internal.Core
 import qualified Pulsar.Protocol.Commands      as P
 import           Pulsar.Protocol.Frame          ( Payload(..) )
 import           Pulsar.Types
-
-class Monad m => MonadPulsar m where
-  liftPulsar :: Pulsar a -> m a
-
-instance MonadPulsar Pulsar where
-  liftPulsar = id
-
-runPulsar :: Connection -> Pulsar a -> IO a
-runPulsar conn (Pulsar m) = do
-  producers <- newIORef []
-  runReaderT m (Ctx conn producers)
 
 logRequest :: (MonadIO m, Show a) => a -> m ()
 logRequest cmd = liftIO . putStrLn $ ">>> " <> show cmd
@@ -32,78 +18,64 @@ logResponse cmd = liftIO . putStrLn $ "<<< " <> show cmd
 
 ------ Simple commands ------
 
-ping :: (MonadIO m, MonadReader PulsarCtx m) => m ()
-ping = do
-  (Ctx (Conn s) _) <- ask
+ping :: MonadIO m => Connection -> m ()
+ping (Conn s) = do
   logRequest P.ping
   sendSimpleCmd s P.ping
   resp <- receive s
   logResponse resp
 
-lookup :: (MonadIO m, MonadReader PulsarCtx m) => Topic -> m ()
-lookup topic = do
-  (Ctx (Conn s) _) <- ask
+lookup :: Connection -> Topic -> IO ()
+lookup (Conn s) topic = do
   logRequest $ P.lookup topic
   sendSimpleCmd s $ P.lookup topic
   resp <- receive s
   logResponse resp
 
-newProducer :: (MonadIO m, MonadReader PulsarCtx m) => Topic -> m ()
-newProducer topic = do
-  (Ctx (Conn s) _) <- ask
-  logRequest $ P.producer topic
-  sendSimpleCmd s $ P.producer topic
+newProducer :: Connection -> B.Word64 -> Topic -> IO ()
+newProducer (Conn s) pid topic = do
+  logRequest $ P.producer pid topic
+  sendSimpleCmd s $ P.producer pid topic
   resp <- receive s
   logResponse resp
 
-closeProducer :: (MonadIO m, MonadReader PulsarCtx m) => m ()
-closeProducer = do
-  (Ctx (Conn s) _) <- ask
-  logRequest P.closeProducer
-  sendSimpleCmd s P.closeProducer
+closeProducer :: Connection -> B.Word64 -> IO ()
+closeProducer (Conn s) pid = do
+  logRequest $ P.closeProducer pid
+  sendSimpleCmd s $ P.closeProducer pid
   resp <- receive s
   logResponse resp
 
-newSubscriber
-  :: (MonadIO m, MonadReader PulsarCtx m) => Topic -> SubscriptionName -> m ()
-newSubscriber topic subs = do
-  (Ctx (Conn s) _) <- ask
-  logRequest $ P.subscribe topic subs
-  sendSimpleCmd s $ P.subscribe topic subs
+newSubscriber :: Connection -> B.Word64 ->Topic -> SubscriptionName -> IO ()
+newSubscriber (Conn s) cid topic subs = do
+  logRequest $ P.subscribe cid topic subs
+  sendSimpleCmd s $ P.subscribe cid topic subs
   resp <- receive s
   logResponse resp
 
-flow :: (MonadIO m, MonadReader PulsarCtx m) => m (Maybe MessageIdData)
-flow = do
-  (Ctx (Conn s) _) <- ask
-  logRequest P.flow
-  sendSimpleCmd s P.flow
-  resp <- receive s
-  logResponse resp
-  return $ P.getMessageId (getCommand resp)
+flow :: Connection -> B.Word64 -> IO ()
+flow (Conn s) cid = do
+  logRequest $ P.flow cid
+  sendSimpleCmd s $ P.flow cid
 
-ack :: (MonadIO m, MonadReader PulsarCtx m) => MessageIdData -> m ()
-ack msgId = do
-  (Ctx (Conn s) _) <- ask
-  logRequest $ P.ack msgId
-  sendSimpleCmd s $ P.ack msgId
-  resp <- receive s
-  logResponse resp
+ack :: MonadIO m => Connection -> B.Word64 -> CommandMessage -> m ()
+ack (Conn s) cid msg = do
+  let msgId = msg ^. F.messageId
+  logRequest $ P.ack cid msgId
+  sendSimpleCmd s $ P.ack cid msgId
 
-closeConsumer :: (MonadIO m, MonadReader PulsarCtx m) => m ()
-closeConsumer = do
-  (Ctx (Conn s) _) <- ask
-  logRequest P.closeConsumer
-  sendSimpleCmd s P.closeConsumer
+closeConsumer :: Connection -> B.Word64 -> IO ()
+closeConsumer (Conn s) cid = do
+  logRequest $ P.closeConsumer cid
+  sendSimpleCmd s $ P.closeConsumer cid
   resp <- receive s
   logResponse resp
 
 ------ Payload commands ------
 
-send :: (MonadIO m, MonadReader PulsarCtx m) => PulsarMessage -> m ()
-send (PulsarMessage msg) = do
-  (Ctx (Conn s) _) <- ask
-  logRequest P.send
-  sendPayloadCmd s P.send P.messageMetadata (Just $ Payload msg)
+send :: Connection -> B.Word64 -> PulsarMessage -> IO ()
+send (Conn s) pid (PulsarMessage msg) = do
+  logRequest $ P.send pid
+  sendPayloadCmd s (P.send pid) P.messageMetadata (Just $ Payload msg)
   resp <- receive s
   logResponse resp

@@ -2,8 +2,9 @@
 
 module Pulsar.Connection where
 
-import           Control.Monad.IO.Class
 import           Control.Monad.Managed
+import qualified Data.Binary                   as B
+import           Data.IORef
 import qualified Network.Socket                as NS
 import qualified Network.Socket.ByteString.Lazy
                                                as SBL
@@ -21,10 +22,23 @@ import           Pulsar.Protocol.Frame          ( Payload
 
 newtype Connection = Conn NS.Socket
 
+-- A list of identifiers and an incremental counter to assign unique ids
+type IdCounter = ([B.Word64], B.Word64)
+
+getSetId :: MonadIO m => IORef IdCounter -> m B.Word64
+getSetId ref = liftIO
+  $ atomicModifyIORef ref (\(c, i) -> let i' = i + 1 in ((i' : c, i'), i))
+
 data ConnectData = ConnData
     { connHost :: NS.HostName
     , connPort :: NS.ServiceName
     } deriving Show
+
+data PulsarCtx = Ctx
+  { ctxConn :: Connection
+  , ctxConsumers :: IORef IdCounter
+  , ctxProducers :: IORef IdCounter
+  }
 
 defaultConnectData :: ConnectData
 defaultConnectData = ConnData { connHost = "127.0.0.1", connPort = "6650" }
@@ -36,7 +50,7 @@ getCommand response = case response of
   (PayloadResponse cmd _ _) -> cmd
 
 connect
-  :: (MonadFail m, MonadIO m, MonadManaged m) => ConnectData -> m Connection
+  :: (MonadFail m, MonadIO m, MonadManaged m) => ConnectData -> m PulsarCtx
 connect (ConnData h p) = do
   sock <- acquireSocket h p
   liftIO $ sendSimpleCmd sock P.connect
@@ -44,14 +58,21 @@ connect (ConnData h p) = do
   case P.getConnected (getCommand resp) of
     Just res -> liftIO . putStrLn $ "<<< " <> show res
     Nothing  -> fail "Could not connect"
-  return $ Conn sock
+  consumers <- liftIO $ newIORef ([], 0)
+  producers <- liftIO $ newIORef ([], 0)
+  return $ Ctx (Conn sock) consumers producers
 
 sendSimpleCmd :: MonadIO m => NS.Socket -> BaseCommand -> m ()
 sendSimpleCmd s cmd =
   liftIO . SBL.sendAll s $ encodeBaseCommand Nothing Nothing cmd
 
 sendPayloadCmd
-  :: MonadIO m => NS.Socket -> BaseCommand -> MessageMetadata -> Maybe Payload -> m ()
+  :: MonadIO m
+  => NS.Socket
+  -> BaseCommand
+  -> MessageMetadata
+  -> Maybe Payload
+  -> m ()
 sendPayloadCmd s cmd meta payload =
   liftIO . SBL.sendAll s $ encodeBaseCommand (Just meta) payload cmd
 

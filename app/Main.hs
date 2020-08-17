@@ -1,44 +1,32 @@
-{-# LANGUAGE LambdaCase, OverloadedStrings #-}
+{-# LANGUAGE OverloadedStrings, RecordWildCards #-}
 
 module Main where
 
+import           Control.Concurrent             ( threadDelay )
+import           Control.Concurrent.Async       ( concurrently_ )
+import           Control.Monad                  ( forever )
 import           Control.Monad.IO.Class         ( liftIO )
-import           Control.Concurrent             ( forkIO
-                                                , threadDelay
+import           Control.Monad.Managed          ( Managed
+                                                , with
                                                 )
-import           Control.Monad.Managed          ( with )
-import           Prelude                 hiding ( lookup )
+import           Data.Foldable                  ( traverse_ )
 import           Pulsar
 
 main :: IO ()
-main = with (connect defaultConnectData) $ \conn -> runPulsar conn $ do
-  ping
-  lookup topic
-  newSubscriber topic "test-sub"
-  lookup topic
-  newProducer topic
-  liftIO $ runConsumer conn
-  send "foo"
-  sleep 2
-  closeConsumer
-  closeProducer
-  sleep 1
+main = with resources $ \(Consumer {..}, Producer {..}) ->
+  let c = forever $ fetch >>= \m -> print m >> ack m
+      p = traverse_ produce ["foo", "bar", "taz", "nop", "yay"] >> sleep 5
+  in  concurrently_ c p
 
-runConsumer conn = forkIO $ runPulsar conn $ do
-  flow >>= \case
-    Just msgId -> ack msgId
-    Nothing    -> pure ()
+resources :: Managed (Consumer IO, Producer IO)
+resources = do
+  ctx      <- connect defaultConnectData
+  consumer <- newConsumer ctx topic "test-sub"
+  producer <- newProducer ctx topic
+  return (consumer, producer)
 
-sleep :: Int -> Pulsar ()
-sleep n = liftIO $ threadDelay (n * 1000000)
+sleep :: Int -> IO ()
+sleep n = threadDelay (n * 1000000)
 
 topic :: Topic
 topic = defaultTopic "app"
-
-concrete :: Pulsar ()
-concrete = do
-  ping
-  newSubscriber topic "test-sub"
-
-abstract :: MonadPulsar m => m ()
-abstract = liftPulsar $ ping >> newProducer topic
