@@ -2,7 +2,9 @@
 
 module Pulsar.Connection where
 
+import           Control.Monad.Catch            ( MonadThrow )
 import           Control.Monad.Managed
+import           Control.Exception              ( throwIO )
 import qualified Data.Binary                   as B
 import           Data.IORef
 import qualified Network.Socket                as NS
@@ -50,14 +52,14 @@ getCommand response = case response of
   (PayloadResponse cmd _ _) -> cmd
 
 connect
-  :: (MonadFail m, MonadIO m, MonadManaged m) => ConnectData -> m PulsarCtx
+  :: (MonadThrow m, MonadIO m, MonadManaged m) => ConnectData -> m PulsarCtx
 connect (ConnData h p) = do
   sock <- acquireSocket h p
   liftIO $ sendSimpleCmd sock P.connect
   resp <- receive sock
   case P.getConnected (getCommand resp) of
     Just res -> liftIO . putStrLn $ "<<< " <> show res
-    Nothing  -> fail "Could not connect"
+    Nothing  -> liftIO . throwIO $ userError "Could not connect"
   consumers <- liftIO $ newIORef ([], 0)
   producers <- liftIO $ newIORef ([], 0)
   return $ Ctx (Conn sock) consumers producers

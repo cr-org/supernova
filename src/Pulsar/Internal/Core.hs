@@ -1,16 +1,16 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, StandaloneDeriving #-}
+{-# LANGUAGE RankNTypes, GeneralizedNewtypeDeriving #-}
 
 module Pulsar.Internal.Core where
 
 import           Control.Monad.Catch
-import           Control.Monad.IO.Unlift
-import           Control.Monad.Reader
+import           Control.Monad.Managed
 import           Pulsar.Connection              ( PulsarCtx )
 
-newtype Pulsar a = Pulsar (ReaderT PulsarCtx IO a)
-  deriving (Functor, Applicative, Monad, MonadIO, MonadReader PulsarCtx)
+newtype Pulsar a = Pulsar (Managed a)
+  deriving (Functor, Applicative, Monad, MonadIO, MonadManaged, MonadThrow)
 
-deriving instance MonadThrow Pulsar
-deriving instance MonadCatch Pulsar
-deriving instance MonadMask Pulsar
-deriving instance MonadUnliftIO Pulsar
+runPulsar :: forall a b. Pulsar a -> (a -> IO b) -> IO b
+runPulsar (Pulsar mgd) = with mgd
+
+instance MonadThrow Managed where
+  throwM = liftIO . throwM

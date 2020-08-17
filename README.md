@@ -19,9 +19,29 @@ Or within a Nix shell (run `nix-shell` at the project's root).
 cabal new-build
 ```
 
-### Run the example
+### Consumer / Producer example
 
-The example in `app/Main.hs` simply connects to a local Pulsar instance and emits some simple commands.
+The example in `app/Main.hs` showcases a simple consumer/producer program that run concurrently (needs the `async` library).
+
+```haskell
+main :: IO ()
+main = runPulsar resources $ \(Consumer {..}, Producer {..}) ->
+  let c = forever $ fetch >>= \m -> print m >> ack m
+      p = traverse_ produce ["foo", "bar", "taz"]
+  in  concurrently_ c p
+
+topic :: Topic
+topic = defaultTopic "app"
+
+resources :: Pulsar (Consumer IO, Producer IO)
+resources = do
+  ctx      <- connect defaultConnectData
+  consumer <- newConsumer ctx topic "test-sub"
+  producer <- newProducer ctx topic
+  return (consumer, producer)
+```
+
+Run it with the following command:
 
 ```shell
 cabal new-run
@@ -32,37 +52,22 @@ You should see an output similar to the one below.
 ```
 [ Establishing connection with Pulsar ]
 <<< {server_version: "Pulsar Server" protocol_version: 15 max_message_size: 5242880}
->>> {type: PING ping { }}
-<<< SimpleResponse {type: PONG pong { }}
 >>> {type: LOOKUP lookupTopic { topic: "non-persistent://public/default/app" request_id: 0 }}
 <<< SimpleResponse {type: LOOKUP_RESPONSE lookupTopicResponse { brokerServiceUrl: "pulsar://localhost:6650" response: Connect request_id: 0 authoritative: true proxy_through_service_url: true }}
 >>> {type: SUBSCRIBE subscribe { topic: "non-persistent://public/default/app" subscription: "test-sub" subType: Shared consumer_id: 0 request_id: 0 }}
 <<< SimpleResponse {type: SUCCESS success { request_id: 0 }}
+>>> {type: FLOW flow { consumer_id: 0 messagePermits: 100 }}
 >>> {type: LOOKUP lookupTopic { topic: "non-persistent://public/default/app" request_id: 0 }}
 <<< SimpleResponse {type: LOOKUP_RESPONSE lookupTopicResponse { brokerServiceUrl: "pulsar://localhost:6650" response: Connect request_id: 0 authoritative: true proxy_through_service_url: true }}
 >>> {type: PRODUCER producer { topic: "non-persistent://public/default/app" producer_id: 0 request_id: 0 }}
-<<< SimpleResponse {type: PRODUCER_SUCCESS producer_success { request_id: 0 producer_name: "standalone-3-83" last_sequence_id: -1 schema_version: "" }}
->>> {type: FLOW flow { consumer_id: 0 messagePermits: 1 }}
+<<< SimpleResponse {type: PRODUCER_SUCCESS producer_success { request_id: 0 producer_name: "standalone-0-92" last_sequence_id: -1 schema_version: "" }}
 >>> {type: SEND send { producer_id: 0 sequence_id: 0 num_messages: 1 }}
 <<< SimpleResponse {type: SEND_RECEIPT send_receipt { producer_id: 0 sequence_id: 0 message_id { ledgerId: 0 entryId: 0 } highest_sequence_id: 18446744073709551615 }}
+>>> {type: SEND send { producer_id: 0 sequence_id: 0 num_messages: 1 }}
 <<< PayloadResponse {type: MESSAGE message { consumer_id: 0 message_id { ledgerId: 0 entryId: 0 partition: -1 } }} {producer_name: "" sequence_id: 0 publish_time: 0} (Just (Payload "foo"))
->>> {type: ACK ack { consumer_id: 0 ack_type: Individual message_id { ledgerId: 0 entryId: 0 partition: -1 } }}
->>> {type: CLOSE_CONSUMER close_consumer { consumer_id: 0 request_id: 0 }}
-<<< SimpleResponse {type: SUCCESS success { request_id: 0 }}
 >>> {type: CLOSE_PRODUCER close_producer { producer_id: 0 request_id: 0 }}
 <<< SimpleResponse {type: SUCCESS success { request_id: 0 }}
-<<< SimpleResponse {type: PING ping { }}
+>>> {type: CLOSE_CONSUMER close_consumer { consumer_id: 0 request_id: 0 }}
+<<< SimpleResponse {type: SUCCESS success { request_id: 0 }}
 [ Closing Pulsar connection ]
-```
-
-And something like this in the Pulsar logs.
-
-```
-pulsar_1          | 09:56:20.387 [pulsar-io-50-1] INFO  org.apache.pulsar.broker.service.ServerCnx - New connection from /172.26.0.1:53836
-pulsar_1          | 09:56:22.391 [pulsar-io-50-1] INFO  org.apache.pulsar.broker.service.ServerCnx - [/172.26.0.1:53836][non-persistent://public/default/app] Creating producer. producerId=0
-pulsar_1          | 09:56:22.392 [ForkJoinPool.commonPool-worker-6] INFO  org.apache.pulsar.broker.service.ServerCnx - [/172.26.0.1:53836] non-persistent://public/default/app configured with schema false
-pulsar_1          | 09:56:22.393 [ForkJoinPool.commonPool-worker-6] INFO  org.apache.pulsar.broker.service.ServerCnx - [/172.26.0.1:53836] Created new producer: Producer{topic=NonPersistentTopic{topic=non-persistent://public/default/app}, client=/172.26.0.1:53836, producerName=standalone-0-70, producerId=0}
-pulsar_1          | 09:56:24.396 [pulsar-io-50-1] INFO  org.apache.pulsar.broker.service.ServerCnx - [NonPersistentTopic{topic=non-persistent://public/default/app}][standalone-0-70] Closing producer on cnx /172.26.0.1:53836
-pulsar_1          | 09:56:24.396 [pulsar-io-50-1] INFO  org.apache.pulsar.broker.service.ServerCnx - [NonPersistentTopic{topic=non-persistent://public/default/app}][standalone-0-70] Closed producer on cnx /172.26.0.1:53836
-pulsar_1          | 09:56:24.397 [pulsar-io-50-1] INFO  org.apache.pulsar.broker.service.ServerCnx - Closed connection from /172.26.0.1:53836
 ```
