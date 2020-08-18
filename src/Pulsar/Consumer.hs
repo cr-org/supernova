@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase #-}
+
 module Pulsar.Consumer where
 
 import           Control.Monad                  ( forever )
@@ -46,15 +48,11 @@ newConsumer (Ctx conn@(Conn s) app) topic sub = do
                (\i -> C.closeConsumer conn chan cid >> killThread i)
     )
  where
-  fetcher app fc = liftIO . forever $ do
-    resp <- readChan app
-    case getCommand resp ^. F.maybe'message of
-      Just msg ->
-        case resp of
-          PayloadResponse _ _ p ->
-            writeChan fc (Msg msg p)
-          _ -> return ()
+  fetcher app fc = liftIO . forever $ readChan app >>= \case
+    PayloadResponse cmd _ p -> case cmd ^. F.maybe'message of
+      Just msg -> writeChan fc (Msg msg p)
       Nothing  -> return ()
+    _ -> return ()
   acker cid = liftIO . C.ack conn cid
   mkSubscriber chan cid = do
     C.lookup conn chan topic
