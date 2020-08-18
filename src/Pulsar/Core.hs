@@ -1,57 +1,67 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Pulsar.Core where
 
+import           Control.Exception              ( throwIO )
+import           Control.Monad.Catch            ( MonadThrow )
 import           Control.Monad.IO.Class
 import qualified Data.Binary                   as B
+import           Data.Text                      ( Text )
 import           Lens.Family
 import           Proto.PulsarApi
 import qualified Proto.PulsarApi_Fields        as F
 import           Pulsar.Connection
 import qualified Pulsar.Protocol.Commands      as P
-import           Pulsar.Protocol.Frame          ( Payload(..) )
+import           Pulsar.Protocol.Frame          ( Payload(..)
+                                                , Response(..)
+                                                )
 import           Pulsar.Types
-
-logRequest :: (MonadIO m, Show a) => a -> m ()
-logRequest cmd = liftIO . putStrLn $ ">>> " <> show cmd
-
-logResponse :: (MonadIO m, Show a) => a -> m ()
-logResponse cmd = liftIO . putStrLn $ "<<< " <> show cmd
+import           UnliftIO.Chan
 
 ------ Simple commands ------
 
-ping :: MonadIO m => Connection -> m ()
-ping (Conn s) = do
-  logRequest P.ping
-  sendSimpleCmd s P.ping
-  resp <- receive s
-  logResponse resp
-
-lookup :: Connection -> Topic -> IO ()
-lookup (Conn s) topic = do
+lookup :: Connection -> Chan Response -> Topic -> IO ()
+lookup (Conn s) chan topic = do
   logRequest $ P.lookup topic
   sendSimpleCmd s $ P.lookup topic
-  resp <- receive s
-  logResponse resp
+  cmd <- getCommand <$> readChan chan
+  case cmd ^. F.maybe'lookupTopicResponse of
+    Just s  -> logResponse cmd -- TODO: we may need to analyze it and re-issue another lookup
+    Nothing -> return ()
 
-newProducer :: Connection -> B.Word64 -> Topic -> IO ()
-newProducer (Conn s) pid topic = do
+newProducer :: Connection -> Chan Response -> B.Word64 -> Topic -> IO Text
+newProducer (Conn s) chan pid topic = do
   logRequest $ P.producer pid topic
   sendSimpleCmd s $ P.producer pid topic
-  resp <- receive s
-  logResponse resp
+  cmd <- getCommand <$> readChan chan
+  logResponse cmd
+  case cmd ^. F.maybe'producerSuccess of
+    Just ps -> return $ ps ^. F.producerName
+    Nothing -> return ""
 
-closeProducer :: Connection -> B.Word64 -> IO ()
-closeProducer (Conn s) pid = do
+closeProducer :: Connection -> Chan Response -> B.Word64 -> IO ()
+closeProducer (Conn s) chan pid = do
   logRequest $ P.closeProducer pid
   sendSimpleCmd s $ P.closeProducer pid
-  resp <- receive s
-  logResponse resp
+  cmd <- getCommand <$> readChan chan
+  case cmd ^. F.maybe'success of
+    Just s  -> logResponse cmd
+    Nothing -> return () -- TODO: we may need to check for failure too
 
-newSubscriber :: Connection -> B.Word64 ->Topic -> SubscriptionName -> IO ()
-newSubscriber (Conn s) cid topic subs = do
+newSubscriber
+  :: Connection
+  -> Chan Response
+  -> B.Word64
+  -> Topic
+  -> SubscriptionName
+  -> IO ()
+newSubscriber (Conn s) chan cid topic subs = do
   logRequest $ P.subscribe cid topic subs
   sendSimpleCmd s $ P.subscribe cid topic subs
-  resp <- receive s
-  logResponse resp
+  cmd <- getCommand <$> readChan chan
+  case cmd ^. F.maybe'success of
+    Just s  -> logResponse cmd
+    Nothing -> return () -- TODO: we may need to check for failure too
 
 flow :: Connection -> B.Word64 -> IO ()
 flow (Conn s) cid = do
@@ -64,18 +74,49 @@ ack (Conn s) cid msg = do
   logRequest $ P.ack cid msgId
   sendSimpleCmd s $ P.ack cid msgId
 
-closeConsumer :: Connection -> B.Word64 -> IO ()
-closeConsumer (Conn s) cid = do
+closeConsumer :: Connection -> Chan Response -> B.Word64 -> IO ()
+closeConsumer (Conn s) chan cid = do
   logRequest $ P.closeConsumer cid
   sendSimpleCmd s $ P.closeConsumer cid
-  resp <- receive s
-  logResponse resp
+  cmd <- getCommand <$> readChan chan
+  case cmd ^. F.maybe'success of
+    Just s  -> logResponse cmd
+    Nothing -> return () -- TODO: we may need to check for failure too
+
+------ Keep Alive -------
+
+ping :: (MonadThrow m, MonadIO m) => Connection -> Chan Response -> m ()
+ping (Conn s) chan = do
+  logRequest P.ping
+  sendSimpleCmd s P.ping
+  cmd <- getCommand <$> readChan chan
+  case cmd ^. F.maybe'pong of
+    Just p  -> logResponse p
+    Nothing -> liftIO . throwIO $ userError "Failed to get PONG"
+
+pong :: MonadIO m => Connection -> m ()
+pong (Conn s) = do
+  logRequest P.pong
+  sendSimpleCmd s P.pong
 
 ------ Payload commands ------
 
-send :: Connection -> B.Word64 -> PulsarMessage -> IO ()
-send (Conn s) pid (PulsarMessage msg) = do
-  logRequest $ P.send pid
-  sendPayloadCmd s (P.send pid) P.messageMetadata (Just $ Payload msg)
-  resp <- receive s
-  logResponse resp
+send
+  :: Connection
+  -> Chan Response
+  -> B.Word64
+  -> B.Word64
+  -> PulsarMessage
+  -> IO ()
+send (Conn s) chan pid sid (PulsarMessage msg) = do
+  logRequest $ P.send pid sid
+  sendPayloadCmd s (P.send pid sid) P.messageMetadata (Just $ Payload msg)
+  confirmReception
+ where
+  confirmReception = do
+    cmd <- getCommand <$> readChan chan
+    case cmd ^. F.maybe'sendReceipt of
+      Just s ->
+        let seq = s ^. F.sequenceId
+        in  if seq == sid then logResponse cmd else confirmReception
+      Nothing -> confirmReception

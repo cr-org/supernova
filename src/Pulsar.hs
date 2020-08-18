@@ -1,6 +1,7 @@
 {- TODO: Write documentation once the API is stable enough -}
 module Pulsar
   ( ConnectData
+  , Msg(..)
   , Pulsar
   , PulsarCtx
   , connect

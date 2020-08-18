@@ -21,7 +21,7 @@ cabal new-build
 
 ### Consumer / Producer example
 
-The example in `app/Main.hs` showcases a simple consumer/producer program that run concurrently (needs the `async` library).
+The example located in `app/Main.hs` showcases a simple consumer / producer program that runs concurrently (needs the `async` library).
 
 ```haskell
 main :: IO ()

@@ -81,8 +81,8 @@ closeProducer pid = defMessage
   prod = defMessage
     & F.producerId .~ pid
 
-send :: B.Word64 -> BaseCommand
-send pid = defMessage
+send :: B.Word64 -> B.Word64 -> BaseCommand
+send pid sid = defMessage
     & F.type' .~ BaseCommand'SEND
     & F.send .~ sendCmd
  where
@@ -90,11 +90,7 @@ send pid = defMessage
   sendCmd = defMessage
     & F.numMessages .~ 1
     & F.producerId .~ pid
-
-ping :: BaseCommand
-ping = defMessage
-    & F.type' .~ BaseCommand'PING
-    & F.ping .~ defMessage
+    & F.sequenceId .~ sid
 
 lookup :: Topic -> BaseCommand
 lookup topic = defMessage
@@ -105,12 +101,19 @@ lookup topic = defMessage
    lut = defMessage
      & F.topic .~ T.pack (show topic)
 
+------- Keep Alive --------
+
+ping :: BaseCommand
+ping = defMessage
+    & F.type' .~ BaseCommand'PING
+    & F.ping .~ defMessage
+
+pong :: BaseCommand
+pong = defMessage
+    & F.type' .~ BaseCommand'PONG
+    & F.pong .~ defMessage
+
 ------- Metadata for Payload commands --------
 
 messageMetadata :: MessageMetadata
 messageMetadata = defMessage
-
-------- Responses --------
-
-getConnected :: BaseCommand -> Maybe CommandConnected
-getConnected = view F.maybe'connected
