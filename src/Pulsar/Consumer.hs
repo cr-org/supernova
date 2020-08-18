@@ -24,11 +24,10 @@ import           UnliftIO.Async                 ( async
 import           UnliftIO.Chan
 import           UnliftIO.Concurrent
 
--- a should be the serialized payload
-data Msg a = Msg CommandMessage a deriving Show
+data Msg = Msg CommandMessage (Maybe Payload) deriving Show
 
 data Consumer m a = Consumer
-  { fetch :: m (Msg a)
+  { fetch :: m a
   , ack :: CommandMessage -> m ()
   }
 
@@ -37,7 +36,7 @@ newConsumer
   => PulsarCtx
   -> Topic
   -> SubscriptionName
-  -> m (Consumer f (Maybe Payload))
+  -> m (Consumer f Msg)
 newConsumer (Ctx conn@(Conn s) app) topic sub = do
   chan  <- newChan
   cid   <- mkConsumerId chan app

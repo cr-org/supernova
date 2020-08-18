@@ -18,7 +18,7 @@ main = runPulsar resources $ \(Consumer {..}, Producer {..}) ->
 topic :: Topic
 topic = defaultTopic "app"
 
---resources :: Pulsar (Consumer IO, Producer IO)
+resources :: Pulsar (Consumer IO Msg, Producer IO)
 resources = do
   ctx      <- connect defaultConnectData
   consumer <- newConsumer ctx topic "test-sub"
