@@ -12,9 +12,11 @@ import           Lens.Family
 import           Proto.PulsarApi
 import qualified Proto.PulsarApi_Fields        as F
 import           Pulsar.Connection
+import           Pulsar.Internal.Logger
 import qualified Pulsar.Protocol.Commands      as P
 import           Pulsar.Protocol.Frame          ( Payload(..)
                                                 , Response(..)
+                                                , getCommand
                                                 )
 import           Pulsar.Types
 import           UnliftIO.Chan

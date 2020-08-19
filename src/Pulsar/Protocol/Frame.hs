@@ -35,3 +35,8 @@ data PayloadCmd = PayloadCommand
 newtype Payload = Payload CL.ByteString deriving Show
 
 data Response = SimpleResponse BaseCommand | PayloadResponse BaseCommand MessageMetadata (Maybe Payload) deriving Show
+
+getCommand :: Response -> BaseCommand
+getCommand response = case response of
+  (SimpleResponse cmd     ) -> cmd
+  (PayloadResponse cmd _ _) -> cmd

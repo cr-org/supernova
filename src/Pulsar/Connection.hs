@@ -23,6 +23,7 @@ import           Proto.PulsarApi                ( BaseCommand
                                                 , MessageMetadata
                                                 )
 import qualified Proto.PulsarApi_Fields        as F
+import           Pulsar.Internal.Logger
 import           Pulsar.Internal.TCPClient      ( acquireSocket )
 import qualified Pulsar.Protocol.Commands      as P
 import           Pulsar.Protocol.Decoder        ( decodeBaseCommand )
@@ -30,6 +31,7 @@ import           Pulsar.Protocol.Encoder        ( encodeBaseCommand )
 import           Pulsar.Protocol.Frame          ( Payload
                                                 , Response(..)
                                                 , frameMaxSize
+                                                , getCommand
                                                 )
 import           UnliftIO.Chan
 
@@ -69,21 +71,6 @@ data PulsarCtx = Ctx
 defaultConnectData :: ConnectData
 defaultConnectData = ConnData { connHost = "127.0.0.1", connPort = "6650" }
 
--- Could be a lens but not worth it for now
-getCommand :: Response -> BaseCommand
-getCommand response = case response of
-  (SimpleResponse cmd     ) -> cmd
-  (PayloadResponse cmd _ _) -> cmd
-
-logRequest :: (MonadIO m, Show a) => a -> m ()
-logRequest cmd = liftIO . putStrLn $ ">>> " <> show cmd
-
-logResponse :: (MonadIO m, Show a) => a -> m ()
-logResponse cmd = liftIO . putStrLn $ "<<< " <> show cmd
-
-initAppState :: MonadIO m => m (IORef AppState)
-initAppState = liftIO . newIORef $ AppState [] 0 [] 0
-
 connect
   :: (MonadThrow m, MonadIO m, MonadManaged m) => ConnectData -> m PulsarCtx
 connect (ConnData h p) = do
@@ -98,6 +85,9 @@ connect (ConnData h p) = do
   let ctx = Ctx (Conn socket) app
   using $ ctx <$ managed
     (E.bracket (forkIO (recvDispatch socket app)) killThread)
+
+initAppState :: MonadIO m => m (IORef AppState)
+initAppState = liftIO . newIORef $ AppState [] 0 [] 0
 
 recvDispatch :: MonadIO m => NS.Socket -> IORef AppState -> m ()
 recvDispatch s ref = forever $ do

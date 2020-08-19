@@ -39,9 +39,8 @@ parsePayload ts cs simpleCmd = do
   cm <- B.getWord32be
   ms <- B.getInt32be
   md <- B.getLazyByteString . fromIntegral $ ms
-  -- 14 bytes = 4 (command size field) + 2 (magic number) + 4 (checksum) + 4 (metadata size field)
-  let remainingBytes = ts - (14 + cs + ms)
-  pl <- payload remainingBytes
+  -- 14 remaining bytes = 4 (command size field) + 2 (magic number) + 4 (checksum) + 4 (metadata size field)
+  pl <- payload $ ts - (14 + cs + ms)
   let payloadCmd = PayloadCommand cm ms md pl
   validateCheckSum (PayloadFrame simpleCmd payloadCmd)
  where

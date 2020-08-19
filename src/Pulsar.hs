@@ -7,6 +7,7 @@ module Pulsar
   , connect
   , defaultConnectData
   , runPulsar
+  , runPulsar'
   , module Pulsar.Consumer
   , module Pulsar.Producer
   , module Pulsar.Types
@@ -16,8 +17,6 @@ where
 import           Pulsar.Connection
 import           Pulsar.Consumer
 import           Pulsar.Core
-import           Pulsar.Internal.Core           ( Pulsar
-                                                , runPulsar
-                                                )
+import           Pulsar.Internal.Core
 import           Pulsar.Producer
 import           Pulsar.Types

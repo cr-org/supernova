@@ -4,6 +4,7 @@ module Main where
 
 import           Control.Concurrent             ( threadDelay )
 import           Control.Concurrent.Async       ( concurrently_ )
+import           Control.Logging                ( LogLevel(..) )
 import           Control.Monad                  ( forever )
 import           Data.Foldable                  ( traverse_ )
 import           Pulsar
@@ -17,7 +18,7 @@ topic :: Topic
 topic = defaultTopic "app"
 
 demo :: IO ()
-demo = runPulsar resources $ \(Consumer {..}, Producer {..}) ->
+demo = runPulsar' LevelInfo resources $ \(Consumer {..}, Producer {..}) ->
   let c = forever $ fetch >>= \msg@(Msg m _) -> print msg >> ack m
       p = forever $ sleep 5 >> traverse_ produce ["foo", "bar", "taz"]
   in  concurrently_ c p
