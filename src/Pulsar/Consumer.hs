@@ -1,16 +1,19 @@
-{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE LambdaCase, OverloadedStrings #-}
 
 module Pulsar.Consumer where
 
 import           Control.Monad                  ( forever )
 import qualified Control.Monad.Catch           as E
 import           Control.Monad.Managed
+import qualified Data.ByteString.Lazy.Char8    as CL
+import qualified Data.Text                     as T
 import           Lens.Family
 import           Proto.PulsarApi                ( CommandMessage )
 import qualified Proto.PulsarApi_Fields        as F
 import qualified Pulsar.Core                   as C
 import           Pulsar.Connection
-import           Pulsar.Protocol.Frame          ( Payload
+import           Pulsar.Internal.Logger         ( logResponse )
+import           Pulsar.Protocol.Frame          ( Payload(..)
                                                 , Response(..)
                                                 )
 import           Pulsar.Types
@@ -18,8 +21,6 @@ import           UnliftIO.Chan
 import           UnliftIO.Concurrent            ( forkIO
                                                 , killThread
                                                 )
-
-data Msg = Msg CommandMessage (Maybe Payload) deriving Show
 
 data Consumer m a = Consumer
   { fetch :: m a
@@ -31,7 +32,7 @@ newConsumer
   => PulsarCtx
   -> Topic
   -> SubscriptionName
-  -> m (Consumer f Msg)
+  -> m (Consumer f Message)
 newConsumer (Ctx conn@(Conn s) app) topic sub = do
   chan  <- newChan
   cid   <- mkConsumerId chan app
@@ -43,8 +44,10 @@ newConsumer (Ctx conn@(Conn s) app) topic sub = do
  where
   fetcher app fc = liftIO . forever $ readChan app >>= \case
     PayloadResponse cmd _ p -> case cmd ^. F.maybe'message of
-      Just msg -> writeChan fc (Msg msg p)
-      Nothing  -> return ()
+      Just msg ->
+        let pm = Message msg $ maybe "" (\(Payload x) -> x) p
+        in  logResponse msg >> writeChan fc pm
+      Nothing -> return ()
     _ -> return ()
   acker cid = liftIO . C.ack conn cid
   mkSubscriber chan cid = do

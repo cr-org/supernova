@@ -19,11 +19,11 @@ topic = defaultTopic "app"
 
 demo :: IO ()
 demo = runPulsar' LevelInfo resources $ \(Consumer {..}, Producer {..}) ->
-  let c = forever $ fetch >>= \msg@(Msg m _) -> print msg >> ack m
+  let c = forever $ fetch >>= \m@(Message i _) -> print m >> ack i
       p = forever $ sleep 5 >> traverse_ produce ["foo", "bar", "taz"]
   in  concurrently_ c p
 
-resources :: Pulsar (Consumer IO Msg, Producer IO)
+resources :: Pulsar (Consumer IO Message, Producer IO)
 resources = do
   ctx      <- connect defaultConnectData
   consumer <- newConsumer ctx topic "test-sub"
@@ -35,6 +35,6 @@ sleep n = threadDelay (n * 1000000)
 
 streamDemo :: IO ()
 streamDemo = runPulsar resources $ \(Consumer {..}, Producer {..}) ->
-  let c = forever $ fetch >>= \msg@(Msg m _) -> print msg >> ack m
+  let c = forever $ fetch >>= \m@(Message i _) -> print m >> ack i
       p = forever $ sleep 5 >> traverse_ produce ["foo", "bar", "taz"]
   in  S.drain . asyncly . maxThreads 10 $ S.yieldM c <> S.yieldM p

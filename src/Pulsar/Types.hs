@@ -4,6 +4,7 @@ import qualified Data.ByteString.Lazy.Char8    as CL
 import           Data.Char                      ( toLower )
 import           Data.String
 import qualified Data.Text                     as T
+import           Proto.PulsarApi                ( CommandMessage )
 
 ------- Topic ---------
 
@@ -45,6 +46,8 @@ newtype TopicName = TopicName String
 
 instance Show TopicName where
   show (TopicName t) = t
+
+data Message = Message CommandMessage CL.ByteString deriving Show
 
 newtype PulsarMessage = PulsarMessage CL.ByteString deriving Show
 
