@@ -7,15 +7,20 @@ import           Control.Concurrent.Async       ( concurrently_ )
 import           Control.Monad                  ( forever )
 import           Data.Foldable                  ( traverse_ )
 import           Pulsar
+import           Streamly
+import qualified Streamly.Prelude              as S
 
 main :: IO ()
-main = runPulsar resources $ \(Consumer {..}, Producer {..}) ->
-  let c = forever $ fetch >>= \msg@(Msg m _) -> print msg >> ack m
-      p = forever $ sleep 5 >> traverse_ produce ["foo", "bar", "taz"]
-  in  concurrently_ c p
+main = streamDemo
 
 topic :: Topic
 topic = defaultTopic "app"
+
+demo :: IO ()
+demo = runPulsar resources $ \(Consumer {..}, Producer {..}) ->
+  let c = forever $ fetch >>= \msg@(Msg m _) -> print msg >> ack m
+      p = forever $ sleep 5 >> traverse_ produce ["foo", "bar", "taz"]
+  in  concurrently_ c p
 
 resources :: Pulsar (Consumer IO Msg, Producer IO)
 resources = do
@@ -26,3 +31,9 @@ resources = do
 
 sleep :: Int -> IO ()
 sleep n = threadDelay (n * 1000000)
+
+streamDemo :: IO ()
+streamDemo = runPulsar resources $ \(Consumer {..}, Producer {..}) ->
+  let c = forever $ fetch >>= \msg@(Msg m _) -> print msg >> ack m
+      p = forever $ sleep 5 >> traverse_ produce ["foo", "bar", "taz"]
+  in  S.drain . asyncly . maxThreads 10 $ S.yieldM c <> S.yieldM p

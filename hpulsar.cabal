@@ -62,5 +62,6 @@ executable hpulsar
   build-depends:       base
                      , async
                      , hpulsar
+                     , streamly
   hs-source-dirs:      app
   default-language:    Haskell2010

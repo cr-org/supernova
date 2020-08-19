@@ -80,3 +80,15 @@ Msg {consumer_id: 0 message_id { ledgerId: 0 entryId: 0 partition: -1 }} (Just (
 <<< {type: SUCCESS success { request_id: 0 }}
 [ Closing Pulsar connection ]
 ```
+
+### Streaming
+
+Since both consumers and producers operate on any `MonadIO m`, we could leverage some streaming libraries. Here's the same example using [streamly](https://hackage.haskell.org/package/streamly).
+
+```haskell
+main :: IO ()
+main = runPulsar resources $ \(Consumer {..}, Producer {..}) ->
+  let c = forever $ fetch >>= \msg@(Msg m _) -> print msg >> ack m
+      p = forever $ sleep 5 >> traverse_ produce ["foo", "bar", "taz"]
+  in  S.drain . asyncly . maxThreads 10 $ S.yieldM c <> S.yieldM p
+```
