@@ -6,6 +6,7 @@ import           Control.Exception              ( throwIO )
 import           Control.Monad.Catch            ( MonadThrow )
 import           Control.Monad.IO.Class
 import qualified Data.Binary                   as B
+import           Data.Maybe                     ( maybe )
 import           Data.Text                      ( Text )
 import           Lens.Family
 import           Proto.PulsarApi
@@ -115,11 +116,9 @@ send (Conn s) chan pid sid (PulsarMessage msg) = do
  where
   confirmReception = do
     cmd <- getCommand <$> readChan chan
-    case cmd ^. F.maybe'sendReceipt of
-      Just s ->
-        let pid' = s ^. F.producerId
-            sid' = s ^. F.sequenceId
-        in  if sid' == sid && pid' == pid
-              then logResponse cmd
-              else confirmReception
-      Nothing -> confirmReception
+    let cmd' = cmd ^. F.maybe'sendReceipt
+        pid' = view F.producerId <$> cmd'
+        sid' = view F.sequenceId <$> cmd'
+    maybe confirmReception checkEq $ (,,) <$> cmd' <*> pid' <*> sid'
+  checkEq (c, p, s) | p == pid && s == sid = logResponse c
+                    | otherwise            = confirmReception
