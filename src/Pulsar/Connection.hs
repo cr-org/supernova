@@ -99,7 +99,7 @@ connect (ConnData h p) = do
   using $ ctx <$ managed
     (E.bracket (forkIO (recvDispatch socket app)) killThread)
 
-recvDispatch :: (MonadIO m) => NS.Socket -> IORef AppState -> m ()
+recvDispatch :: MonadIO m => NS.Socket -> IORef AppState -> m ()
 recvDispatch s ref = forever $ do
   resp                 <- receive s
   (AppState cs _ ps _) <- liftIO $ readIORef ref

@@ -117,6 +117,9 @@ send (Conn s) chan pid sid (PulsarMessage msg) = do
     cmd <- getCommand <$> readChan chan
     case cmd ^. F.maybe'sendReceipt of
       Just s ->
-        let seq = s ^. F.sequenceId
-        in  if seq == sid then logResponse cmd else confirmReception
+        let pid' = s ^. F.producerId
+            sid' = s ^. F.sequenceId
+        in  if sid' == sid && pid' == pid
+              then logResponse cmd
+              else confirmReception
       Nothing -> confirmReception

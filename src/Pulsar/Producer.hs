@@ -15,15 +15,14 @@ newtype Producer m = Producer
   }
 
 data ProducerState = ProducerState
-  { stId :: B.Word64            -- a unique producer identifier
-  , stSeqId :: B.Word64         -- an incremental message sequence counter
-  , stName :: Text              -- a unique name
+  { stSeqId :: B.Word64 -- an incremental message sequence counter
+  , stName :: Text      -- a unique name
   }
 
 mkSeqId :: MonadIO m => IORef ProducerState -> m B.Word64
 mkSeqId ref = liftIO $ atomicModifyIORef
   ref
-  (\(ProducerState i s n) -> let s' = s + 1 in (ProducerState i s' n, s))
+  (\(ProducerState s n) -> let s' = s + 1 in (ProducerState s' n, s))
 
 newProducer
   :: (MonadManaged m, MonadIO f) => PulsarCtx -> Topic -> m (Producer f)
@@ -31,7 +30,7 @@ newProducer (Ctx conn app) topic = do
   chan  <- newChan
   pid   <- mkProducerId chan app
   pname <- liftIO $ mkProducer chan pid
-  pst   <- liftIO $ newIORef (ProducerState 0 0 pname)
+  pst   <- liftIO $ newIORef (ProducerState 0 pname)
   using $ managed
     (E.bracket (pure $ Producer (dispatch chan pid pst))
                (const $ C.closeProducer conn chan pid)

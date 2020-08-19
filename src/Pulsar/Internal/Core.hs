@@ -4,7 +4,6 @@ module Pulsar.Internal.Core where
 
 import           Control.Monad.Catch
 import           Control.Monad.Managed
-import           Pulsar.Connection              ( PulsarCtx )
 
 newtype Pulsar a = Pulsar (Managed a)
   deriving (Functor, Applicative, Monad, MonadIO, MonadManaged, MonadThrow)

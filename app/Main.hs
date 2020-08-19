@@ -2,11 +2,10 @@
 
 module Main where
 
-import           Control.Concurrent             ( forkIO, threadDelay )
-import           Control.Concurrent.Async       ( async, wait, concurrently_ )
+import           Control.Concurrent             ( threadDelay )
+import           Control.Concurrent.Async       ( concurrently_ )
 import           Control.Monad                  ( forever )
 import           Data.Foldable                  ( traverse_ )
-import           Data.Functor                   ( void )
 import           Pulsar
 
 main :: IO ()
