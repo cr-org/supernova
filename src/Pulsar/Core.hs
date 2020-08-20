@@ -1,4 +1,4 @@
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE DataKinds, FlexibleContexts, LambdaCase, OverloadedStrings #-}
 
 module Pulsar.Core where
 
@@ -6,7 +6,9 @@ import           Control.Exception              ( throwIO )
 import           Control.Monad.Catch            ( MonadThrow )
 import           Control.Monad.IO.Class
 import qualified Data.Binary                   as B
+import           Data.Functor                   ( void )
 import           Data.Maybe                     ( maybe )
+import           Data.ProtoLens.Field           ( HasField )
 import           Data.Text                      ( Text )
 import           Lens.Family
 import           Proto.PulsarApi
@@ -23,68 +25,76 @@ import           UnliftIO.Chan
 
 ------ Simple commands ------
 
-lookup :: Connection -> Chan Response -> Topic -> IO ()
-lookup (Conn s) chan topic = do
-  logRequest $ P.lookup topic
-  sendSimpleCmd s $ P.lookup topic
-  cmd <- getCommand <$> readChan chan
-  case cmd ^. F.maybe'lookupTopicResponse of
-    Just s  -> logResponse cmd -- TODO: we may need to analyze it and re-issue another lookup
-    Nothing -> return ()
+verifyResponse
+  :: (HasField a "requestId" B.Word64, Show a)
+  => ReqId
+  -> Chan Response
+  -> LensLike' (Constant (Maybe a)) BaseCommand (Maybe a)
+  -> IO (Maybe a)
+verifyResponse r@(ReqId req) chan lens = do
+  resp <- readChan chan
+  let cmd'    = getCommand resp ^. lens
+      req'    = view F.requestId <$> cmd'
+      rewrite = writeChan chan resp
+      loop    = verifyResponse r chan lens
+      checkEq (c, r) | r == req  = cmd' <$ logResponse resp
+                     | otherwise = rewrite >> loop
+  maybe loop checkEq $ (,) <$> cmd' <*> req'
 
-newProducer :: Connection -> Chan Response -> B.Word64 -> Topic -> IO Text
-newProducer (Conn s) chan pid topic = do
-  logRequest $ P.producer pid topic
-  sendSimpleCmd s $ P.producer pid topic
-  cmd <- getCommand <$> readChan chan
-  logResponse cmd
-  case cmd ^. F.maybe'producerSuccess of
+lookup :: Connection -> Chan Response -> ReqId -> Topic -> IO ()
+lookup (Conn s) chan r@(ReqId req) topic = do
+  logRequest $ P.lookup req topic
+  sendSimpleCmd s $ P.lookup req topic
+  -- TODO: we need to analyze it and might need to re-issue another lookup
+  void $ verifyResponse r chan F.maybe'lookupTopicResponse
+
+newProducer
+  :: Connection -> Chan Response -> ReqId -> ProducerId -> Topic -> IO Text
+newProducer (Conn s) chan r@(ReqId req) (PId pid) topic = do
+  logRequest $ P.producer req pid topic
+  sendSimpleCmd s $ P.producer req pid topic
+  verifyResponse r chan F.maybe'producerSuccess >>= \case
     Just ps -> return $ ps ^. F.producerName
     Nothing -> return ""
 
-closeProducer :: Connection -> Chan Response -> B.Word64 -> IO ()
-closeProducer (Conn s) chan pid = do
-  logRequest $ P.closeProducer pid
-  sendSimpleCmd s $ P.closeProducer pid
-  cmd <- getCommand <$> readChan chan
-  case cmd ^. F.maybe'success of
-    Just s  -> logResponse cmd
-    Nothing -> return () -- TODO: we may need to check for failure too
+closeProducer :: Connection -> Chan Response -> ReqId -> ProducerId -> IO ()
+closeProducer (Conn s) chan r@(ReqId req) (PId pid) = do
+  logRequest $ P.closeProducer req pid
+  sendSimpleCmd s $ P.closeProducer req pid
+  -- TODO: we may need to check for failure too
+  void $ verifyResponse r chan F.maybe'success
 
 newSubscriber
   :: Connection
   -> Chan Response
-  -> B.Word64
+  -> ReqId
+  -> ConsumerId
   -> Topic
   -> SubscriptionName
   -> IO ()
-newSubscriber (Conn s) chan cid topic subs = do
-  logRequest $ P.subscribe cid topic subs
-  sendSimpleCmd s $ P.subscribe cid topic subs
-  cmd <- getCommand <$> readChan chan
-  case cmd ^. F.maybe'success of
-    Just s  -> logResponse cmd
-    Nothing -> return () -- TODO: we may need to check for failure too
+newSubscriber (Conn s) chan r@(ReqId req) (CId cid) topic subs = do
+  logRequest $ P.subscribe req cid topic subs
+  sendSimpleCmd s $ P.subscribe req cid topic subs
+  -- TODO: we may need to check for failure too
+  void $ verifyResponse r chan F.maybe'success
 
-flow :: Connection -> B.Word64 -> IO ()
-flow (Conn s) cid = do
+flow :: Connection -> ConsumerId -> IO ()
+flow (Conn s) (CId cid) = do
   logRequest $ P.flow cid
   sendSimpleCmd s $ P.flow cid
 
-ack :: MonadIO m => Connection -> B.Word64 -> CommandMessage -> m ()
-ack (Conn s) cid msg = do
-  let msgId = msg ^. F.messageId
+ack :: MonadIO m => Connection -> ConsumerId -> MessageIdData -> m ()
+ack (Conn s) (CId cid) msgId = do
   logRequest $ P.ack cid msgId
   sendSimpleCmd s $ P.ack cid msgId
 
-closeConsumer :: Connection -> Chan Response -> B.Word64 -> IO ()
-closeConsumer (Conn s) chan cid = do
-  logRequest $ P.closeConsumer cid
-  sendSimpleCmd s $ P.closeConsumer cid
-  cmd <- getCommand <$> readChan chan
-  case cmd ^. F.maybe'success of
-    Just s  -> logResponse cmd
-    Nothing -> return () -- TODO: we may need to check for failure too
+closeConsumer :: Connection -> Chan Response -> ReqId -> ConsumerId -> IO ()
+closeConsumer (Conn s) chan r@(ReqId req) (CId cid) = do
+  logRequest $ P.closeConsumer req cid
+  sendSimpleCmd s $ P.closeConsumer req cid
+  -- TODO: we may need to check for failure too
+  -- FIXME: the response for close consumer never comes on a SIGTERM
+  void $ verifyResponse r chan F.maybe'success
 
 ------ Keep Alive -------
 
@@ -107,20 +117,22 @@ pong (Conn s) = do
 send
   :: Connection
   -> Chan Response
-  -> B.Word64
-  -> B.Word64
+  -> ProducerId
+  -> SeqId
   -> PulsarMessage
   -> IO ()
-send (Conn s) chan pid sid (PulsarMessage msg) = do
+send (Conn s) chan (PId pid) (SeqId sid) (PulsarMessage msg) = do
   logRequest $ P.send pid sid
   sendPayloadCmd s (P.send pid sid) P.messageMetadata (Just $ Payload msg)
   confirmReception
  where
   confirmReception = do
-    cmd <- getCommand <$> readChan chan
-    let cmd' = cmd ^. F.maybe'sendReceipt
-        pid' = view F.producerId <$> cmd'
-        sid' = view F.sequenceId <$> cmd'
-    maybe confirmReception checkEq $ (,,) <$> cmd' <*> pid' <*> sid'
-  checkEq (c, p, s) | p == pid && s == sid = logResponse c
-                    | otherwise            = confirmReception
+    resp <- readChan chan
+    let cmd'    = getCommand resp ^. F.maybe'sendReceipt
+        pid'    = view F.producerId <$> cmd'
+        sid'    = view F.sequenceId <$> cmd'
+        rewrite = writeChan chan resp
+        loop    = confirmReception
+        checkEq (c, p, s) | p == pid && s == sid = logResponse resp
+                          | otherwise            = rewrite >> loop
+    maybe loop checkEq $ (,,) <$> cmd' <*> pid' <*> sid'

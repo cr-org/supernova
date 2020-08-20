@@ -8,7 +8,6 @@ import           Control.Monad.Managed
 import qualified Data.ByteString.Lazy.Char8    as CL
 import qualified Data.Text                     as T
 import           Lens.Family
-import           Proto.PulsarApi                ( CommandMessage )
 import qualified Proto.PulsarApi_Fields        as F
 import qualified Pulsar.Core                   as C
 import           Pulsar.Connection
@@ -24,7 +23,7 @@ import           UnliftIO.Concurrent            ( forkIO
 
 data Consumer m a = Consumer
   { fetch :: m a
-  , ack :: CommandMessage -> m ()
+  , ack :: MsgId -> m ()
   }
 
 newConsumer
@@ -38,19 +37,24 @@ newConsumer (Ctx conn@(Conn s) app) topic sub = do
   cid   <- mkConsumerId chan app
   fchan <- newChan
   using $ Consumer (readChan fchan) (acker cid) <$ managed
-    (E.bracket (mkSubscriber chan cid >> forkIO (fetcher chan fchan))
-               (\i -> C.closeConsumer conn chan cid >> killThread i)
+    (E.bracket
+      (mkSubscriber chan cid >> forkIO (fetcher chan fchan))
+      (\i -> newReq >>= \r -> C.closeConsumer conn chan r cid >> killThread i)
     )
  where
   fetcher app fc = liftIO . forever $ readChan app >>= \case
     PayloadResponse cmd _ p -> case cmd ^. F.maybe'message of
       Just msg ->
-        let pm = Message msg $ maybe "" (\(Payload x) -> x) p
-        in  logResponse msg >> writeChan fc pm
+        let msgId = msg ^. F.messageId
+            pm    = Message (MsgId msgId) $ maybe "" (\(Payload x) -> x) p
+        in  logResponse cmd >> writeChan fc pm
       Nothing -> return ()
     _ -> return ()
-  acker cid = liftIO . C.ack conn cid
+  newReq = mkRequestId app
+  acker cid (MsgId mid) = liftIO $ C.ack conn cid mid
   mkSubscriber chan cid = do
-    C.lookup conn chan topic
-    C.newSubscriber conn chan cid topic sub
+    req1 <- newReq
+    C.lookup conn chan req1 topic
+    req2 <- newReq
+    C.newSubscriber conn chan req2 cid topic sub
     C.flow conn cid

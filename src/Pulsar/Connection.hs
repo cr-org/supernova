@@ -1,3 +1,4 @@
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 
 module Pulsar.Connection where
@@ -21,6 +22,7 @@ import qualified Network.Socket.ByteString.Lazy
 import           Proto.PulsarApi                ( BaseCommand
                                                 , CommandMessage
                                                 , MessageMetadata
+                                                , MessageIdData
                                                 )
 import qualified Proto.PulsarApi_Fields        as F
 import           Pulsar.Internal.Logger
@@ -37,25 +39,38 @@ import           UnliftIO.Chan
 
 newtype Connection = Conn NS.Socket
 
+newtype ReqId = ReqId B.Word64 deriving (Num, Show)
+newtype SeqId = SeqId B.Word64 deriving (Num, Show)
+newtype ProducerId = PId B.Word64 deriving (Num, Show)
+newtype ConsumerId = CId B.Word64 deriving (Num, Show)
+
 data AppState = AppState
-  { appConsumers :: [(B.Word64, Chan Response)] -- a list of consumer identifiers associated with a communication channel
-  , appConsumerId :: B.Word64                   -- an incremental counter to assign unique consumer ids
-  , appProducers :: [(B.Word64, Chan Response)] -- a list of producer identifiers associated with a communication channel
-  , appProducerId :: B.Word64                   -- an incremental counter to assign unique producer ids
+  { appConsumers :: [(ConsumerId, Chan Response)] -- a list of consumer identifiers associated with a communication channel
+  , appConsumerId :: ConsumerId                   -- an incremental counter to assign unique consumer ids
+  , appProducers :: [(ProducerId, Chan Response)] -- a list of producer identifiers associated with a communication channel
+  , appProducerId :: ProducerId                   -- an incremental counter to assign unique producer ids
+  , appRequestId :: ReqId                         -- an incremental counter to assign unique request ids for all commands
   }
 
-mkConsumerId :: MonadIO m => Chan Response -> IORef AppState -> m B.Word64
+mkConsumerId :: MonadIO m => Chan Response -> IORef AppState -> m ConsumerId
 mkConsumerId chan ref = liftIO $ atomicModifyIORef
   ref
-  (\(AppState cs cid ps pid) ->
-    let cid' = cid + 1 in (AppState ((cid', chan) : cs) cid' ps pid, cid)
+  (\(AppState cs cid ps pid rid) ->
+    let cid' = cid + 1 in (AppState ((cid', chan) : cs) cid' ps pid rid, cid)
   )
 
-mkProducerId :: MonadIO m => Chan Response -> IORef AppState -> m B.Word64
+mkProducerId :: MonadIO m => Chan Response -> IORef AppState -> m ProducerId
 mkProducerId chan ref = liftIO $ atomicModifyIORef
   ref
-  (\(AppState cs cid ps pid) ->
-    let pid' = pid + 1 in (AppState cs cid ((pid', chan) : ps) pid', pid)
+  (\(AppState cs cid ps pid rid) ->
+    let pid' = pid + 1 in (AppState cs cid ((pid', chan) : ps) pid' rid, pid)
+  )
+
+mkRequestId :: MonadIO m => IORef AppState -> m ReqId
+mkRequestId ref = liftIO $ atomicModifyIORef
+  ref
+  (\(AppState cs cid ps pid req) ->
+    let req' = req + 1 in (AppState cs cid ps pid req', req)
   )
 
 data ConnectData = ConnData
@@ -79,7 +94,7 @@ connect (ConnData h p) = do
   liftIO $ sendSimpleCmd socket P.connect
   resp <- receive socket
   case getCommand resp ^. F.maybe'connected of
-    Just res -> liftIO . putStrLn $ "<<< " <> show res
+    Just res -> logResponse resp
     Nothing  -> liftIO . throwIO $ userError "Could not connect"
   app <- liftIO initAppState
   let ctx = Ctx (Conn socket) app
@@ -87,13 +102,13 @@ connect (ConnData h p) = do
     (E.bracket (forkIO (recvDispatch socket app)) killThread)
 
 initAppState :: MonadIO m => m (IORef AppState)
-initAppState = liftIO . newIORef $ AppState [] 0 [] 0
+initAppState = liftIO . newIORef $ AppState [] 0 [] 0 0
 
 recvDispatch :: MonadIO m => NS.Socket -> IORef AppState -> m ()
 recvDispatch s ref = forever $ do
-  resp                 <- receive s
-  (AppState cs _ ps _) <- liftIO $ readIORef ref
-  traverse_ (\(_, chan) -> writeChan chan resp) (cs ++ ps)
+  resp                   <- receive s
+  (AppState cs _ ps _ _) <- liftIO $ readIORef ref
+  traverse_ (`writeChan` resp) ((snd <$> cs) ++ (snd <$> ps))
 
 sendSimpleCmd :: MonadIO m => NS.Socket -> BaseCommand -> m ()
 sendSimpleCmd s cmd =

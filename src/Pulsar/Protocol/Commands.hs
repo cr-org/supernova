@@ -21,8 +21,8 @@ connect = defMessage
     & F.clientVersion .~ "Pulsar-Client-Haskell-v" <> T.pack (showVersion version)
     & F.protocolVersion .~ 15
 
-subscribe :: B.Word64 -> Topic -> SubscriptionName -> BaseCommand
-subscribe cid topic (SubscriptionName sub) = defMessage
+subscribe :: B.Word64 -> B.Word64 -> Topic -> SubscriptionName -> BaseCommand
+subscribe req cid topic (SubscriptionName sub) = defMessage
     & F.type' .~ BaseCommand'SUBSCRIBE
     & F.subscribe .~ subs
  where
@@ -32,6 +32,7 @@ subscribe cid topic (SubscriptionName sub) = defMessage
     & F.subscription .~ sub
     & F.subType .~ CommandSubscribe'Shared
     & F.consumerId .~ cid
+    & F.requestId .~ req
 
 flow :: B.Word64 -> BaseCommand
 flow cid = defMessage
@@ -53,17 +54,18 @@ ack cid msgId = defMessage
     & F.messageId .~ [ msgId ]
     & F.consumerId .~ cid
 
-closeConsumer :: B.Word64 -> BaseCommand
-closeConsumer cid = defMessage
+closeConsumer :: B.Word64 -> B.Word64 -> BaseCommand
+closeConsumer req cid = defMessage
     & F.type' .~ BaseCommand'CLOSE_CONSUMER
     & F.closeConsumer .~ close
  where
   close :: CommandCloseConsumer
   close = defMessage
     & F.consumerId .~ cid
+    & F.requestId .~ req
 
-producer :: B.Word64 -> Topic -> BaseCommand
-producer pid topic = defMessage
+producer :: B.Word64 -> B.Word64 -> Topic -> BaseCommand
+producer req pid topic = defMessage
     & F.type' .~ BaseCommand'PRODUCER
     & F.producer .~ prod
  where
@@ -71,15 +73,17 @@ producer pid topic = defMessage
   prod = defMessage
     & F.topic .~ T.pack (show topic)
     & F.producerId .~ pid
+    & F.requestId .~ req
 
-closeProducer :: B.Word64 -> BaseCommand
-closeProducer pid = defMessage
+closeProducer :: B.Word64 -> B.Word64 -> BaseCommand
+closeProducer req pid = defMessage
     & F.type' .~ BaseCommand'CLOSE_PRODUCER
     & F.closeProducer .~ prod
  where
   prod :: CommandCloseProducer
   prod = defMessage
     & F.producerId .~ pid
+    & F.requestId .~ req
 
 send :: B.Word64 -> B.Word64 -> BaseCommand
 send pid sid = defMessage
@@ -92,14 +96,15 @@ send pid sid = defMessage
     & F.producerId .~ pid
     & F.sequenceId .~ sid
 
-lookup :: Topic -> BaseCommand
-lookup topic = defMessage
+lookup :: B.Word64 -> Topic -> BaseCommand
+lookup req topic = defMessage
     & F.type' .~ BaseCommand'LOOKUP
     & F.lookupTopic .~ lut
-  where
-   lut :: CommandLookupTopic
-   lut = defMessage
-     & F.topic .~ T.pack (show topic)
+ where
+  lut :: CommandLookupTopic
+  lut = defMessage
+    & F.topic .~ T.pack (show topic)
+    & F.requestId .~ req
 
 ------- Keep Alive --------
 

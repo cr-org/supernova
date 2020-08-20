@@ -62,6 +62,8 @@ resources = do
   return (consumer, producer)
 ```
 
+A `Message` contains a `MessageID` you need for `ack`ing and a payload defined as a lazy `ByteString`.
+
 Run it with the following command:
 
 ```shell
