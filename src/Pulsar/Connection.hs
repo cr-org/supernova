@@ -1,17 +1,10 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
-{-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, LambdaCase, OverloadedStrings #-}
 
-{- It establishes a connection with Pulsar and makes use of the protocol encoder / decoder -}
 module Pulsar.Connection where
 
-import           Control.Concurrent             ( forkIO
-                                                , killThread
-                                                )
 import           Control.Monad                  ( forever )
 import           Control.Monad.Catch            ( MonadThrow )
-import qualified Control.Monad.Catch           as E
 import           Control.Monad.Managed
-import           Control.Exception              ( throwIO )
 import qualified Data.Binary                   as B
 import           Data.Foldable                  ( traverse_ )
 import           Data.IORef
@@ -22,6 +15,7 @@ import qualified Network.Socket.ByteString.Lazy
                                                as SBL
 import           Proto.PulsarApi                ( BaseCommand
                                                 , CommandMessage
+                                                , CommandPong
                                                 , MessageMetadata
                                                 , MessageIdData
                                                 )
@@ -36,7 +30,16 @@ import           Pulsar.Protocol.Frame          ( Payload
                                                 , frameMaxSize
                                                 , getCommand
                                                 )
+import           System.Timeout                 ( timeout )
+import           UnliftIO.Async                 ( concurrently_ )
 import           UnliftIO.Chan
+import           UnliftIO.Concurrent            ( forkIO
+                                                , killThread
+                                                , threadDelay
+                                                )
+import           UnliftIO.Exception             ( bracket
+                                                , throwIO
+                                                )
 
 newtype Connection = Conn NS.Socket
 
@@ -84,9 +87,11 @@ data PulsarCtx = Ctx
   , ctxState :: IORef AppState
   }
 
+{- | Default connection data: `localhost:6650` -}
 defaultConnectData :: ConnectData
 defaultConnectData = ConnData { connHost = "127.0.0.1", connPort = "6650" }
 
+{- | Starts a Pulsar connection with the supplied 'ConnectData' -}
 connect
   :: (MonadThrow m, MonadIO m, MonadManaged m) => ConnectData -> m PulsarCtx
 connect (ConnData h p) = do
@@ -96,20 +101,36 @@ connect (ConnData h p) = do
   resp <- receive socket
   case getCommand resp ^. F.maybe'connected of
     Just res -> logResponse resp
-    Nothing  -> liftIO . throwIO $ userError "Could not connect"
-  app <- liftIO initAppState
-  let ctx = Ctx (Conn socket) app
-  using $ ctx <$ managed
-    (E.bracket (forkIO (recvDispatch socket app)) killThread)
+    Nothing  -> throwIO $ userError "Could not connect"
+  app   <- liftIO initAppState
+  kchan <- liftIO newChan
+  let ctx        = Ctx (Conn socket) app
+      dispatcher = recvDispatch socket app kchan
+      task       = concurrently_ dispatcher (keepAlive socket kchan)
+  using $ ctx <$ managed (bracket (forkIO task) killThread)
 
 initAppState :: MonadIO m => m (IORef AppState)
 initAppState = liftIO . newIORef $ AppState [] 0 [] 0 0
 
-recvDispatch :: MonadIO m => NS.Socket -> IORef AppState -> m ()
-recvDispatch s ref = forever $ do
+recvDispatch
+  :: MonadIO m => NS.Socket -> IORef AppState -> Chan BaseCommand -> m ()
+recvDispatch s ref chan = forever $ do
   resp                   <- receive s
   (AppState cs _ ps _ _) <- liftIO $ readIORef ref
+  case getCommand resp ^. F.maybe'pong of
+    Just pong -> writeChan chan (getCommand resp)
+    Nothing   -> return ()
   traverse_ (`writeChan` resp) ((snd <$> cs) ++ (snd <$> ps))
+
+{- Emit a PING and expect a PONG every 29 seconds. If a PONG is not received, interrupt connection -}
+keepAlive :: MonadIO m => NS.Socket -> Chan BaseCommand -> m ()
+keepAlive s chan = forever $ do
+  threadDelay (29 * 1000000)
+  logRequest P.ping
+  sendSimpleCmd s P.ping
+  liftIO $ timeout (2 * 1000000) (readChan chan) >>= \case
+    Just cmd -> logResponse cmd
+    Nothing  -> throwIO (userError "Keep Alive interruption")
 
 sendSimpleCmd :: MonadIO m => NS.Socket -> BaseCommand -> m ()
 sendSimpleCmd s cmd =
