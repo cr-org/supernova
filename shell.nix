@@ -2,12 +2,12 @@ let
   packages = import ./pkgs.nix {};
   inherit (packages) pkgs hp;
 
-  drv = hp.callCabal2nix "hpulsar" ./. {};
+  drv = hp.callCabal2nix "supernova" ./. {};
 in
   {
     my_project = drv;
     shell = hp.shellFor {
-      name = "ghc-shell-for-hpulsar";
+      name = "ghc-shell-for-supernova";
       packages = p: [drv];
       buildInputs = with hp; [
         brittany

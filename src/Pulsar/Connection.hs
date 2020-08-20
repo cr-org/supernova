@@ -119,8 +119,7 @@ recvDispatch s ref chan = forever $ do
   (AppState cs _ ps _ _) <- liftIO $ readIORef ref
   case getCommand resp ^. F.maybe'pong of
     Just pong -> writeChan chan (getCommand resp)
-    Nothing   -> return ()
-  traverse_ (`writeChan` resp) ((snd <$> cs) ++ (snd <$> ps))
+    Nothing   -> traverse_ (`writeChan` resp) ((snd <$> cs) ++ (snd <$> ps))
 
 {- Emit a PING and expect a PONG every 29 seconds. If a PONG is not received, interrupt connection -}
 keepAlive :: MonadIO m => NS.Socket -> Chan BaseCommand -> m ()

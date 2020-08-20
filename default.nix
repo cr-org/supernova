@@ -10,5 +10,5 @@ let
   );
 in
   usingProtobuf (
-    hp.callCabal2nix "hpulsar" ./. {}
+    hp.callCabal2nix "supernova" ./. {}
   )

@@ -1,5 +1,5 @@
-hpulsar
-=======
+supernova
+=========
 
 [![CI Status](https://github.com/cr-org/hpulsar/workflows/Haskell%20CI/badge.svg)](https://github.com/cr-org/hpulsar/actions)
 

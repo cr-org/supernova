@@ -8,7 +8,7 @@ import           Data.ProtoLens                 ( defMessage )
 import qualified Data.Text                     as T
 import           Data.Version                   ( showVersion )
 import           Lens.Family
-import           Paths_hpulsar                  ( version )
+import           Paths_supernova                ( version )
 import           Proto.PulsarApi
 import qualified Proto.PulsarApi_Fields        as F
 import           Pulsar.Types
