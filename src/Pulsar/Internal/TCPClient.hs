@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase, OverloadedStrings #-}
 
+{- A simple TCP client, used to communicate with the Pulsar server -}
 module Pulsar.Internal.TCPClient
   ( acquireSocket
   )

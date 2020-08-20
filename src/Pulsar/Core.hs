@@ -1,5 +1,6 @@
 {-# LANGUAGE DataKinds, FlexibleContexts, LambdaCase, OverloadedStrings #-}
 
+{- Defines a set of transactional commands, communicating via internal channels -}
 module Pulsar.Core where
 
 import           Control.Exception              ( throwIO )

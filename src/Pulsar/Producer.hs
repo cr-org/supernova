@@ -1,3 +1,4 @@
+{- Defines a high-level Pulsar producer for the end user -}
 module Pulsar.Producer where
 
 import qualified Control.Monad.Catch           as E

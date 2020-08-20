@@ -5,7 +5,6 @@ module Main where
 
 import           Control.Concurrent             ( threadDelay )
 import           Control.Concurrent.Async       ( concurrently_ )
-import           Control.Logging                ( LogLevel(..) )
 import           Control.Monad                  ( forever )
 import           Data.Aeson
 import qualified Data.ByteString.Lazy.Char8    as CL
@@ -55,8 +54,11 @@ resources = do
 sleep :: Int -> IO ()
 sleep n = threadDelay (n * 1000000)
 
+logOpts :: LogOptions
+logOpts = LogOptions Info StdOut
+
 streamDemo :: IO ()
-streamDemo = runPulsar' LevelInfo resources $ \(Consumer {..}, Producer {..}) ->
+streamDemo = runPulsar' logOpts resources $ \(Consumer {..}, Producer {..}) ->
   let c = forever $ fetch >>= \(Message i p) -> msgDecoder p >> ack i
       p = forever $ sleep 5 >> traverse_ produce messages
   in  S.drain . asyncly . maxThreads 10 $ S.yieldM c <> S.yieldM p

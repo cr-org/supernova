@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+{- Defines a few internal functions for logging requests and responses in debug mode -}
 module Pulsar.Internal.Logger where
 
 import           Control.Logging                ( debug' )

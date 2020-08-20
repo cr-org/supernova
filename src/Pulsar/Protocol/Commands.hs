@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+{- Defines commands using the generated protobuf datatypes -}
 module Pulsar.Protocol.Commands where
 
 import qualified Data.Binary                   as B

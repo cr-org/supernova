@@ -1,5 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
+{- An encoder that understands the Pulsar protocol, as specified at: http://pulsar.apache.org/docs/en/develop-binary-protocol -}
 module Pulsar.Protocol.Encoder
   ( encodeBaseCommand
   )

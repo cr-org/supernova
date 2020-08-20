@@ -2,6 +2,9 @@
 module Pulsar
   ( ConnectData
   , Consumer(..)
+  , LogLevel(..)
+  , LogOptions(..)
+  , LogOutput(..)
   , Producer(..)
   , Pulsar
   , PulsarCtx

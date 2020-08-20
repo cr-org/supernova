@@ -64,7 +64,6 @@ executable hpulsar
                      , async
                      , bytestring
                      , hpulsar
-                     , logging
                      , streamly
                      , text
   hs-source-dirs:      app

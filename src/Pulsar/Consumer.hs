@@ -1,5 +1,6 @@
 {-# LANGUAGE LambdaCase, OverloadedStrings #-}
 
+{- Defines a high-level Pulsar consumer for the end user -}
 module Pulsar.Consumer where
 
 import           Control.Monad                  ( forever )

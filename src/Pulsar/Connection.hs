@@ -1,6 +1,7 @@
 {-# LANGUAGE GeneralizedNewtypeDeriving #-}
 {-# LANGUAGE OverloadedStrings #-}
 
+{- It establishes a connection with Pulsar and makes use of the protocol encoder / decoder -}
 module Pulsar.Connection where
 
 import           Control.Concurrent             ( forkIO

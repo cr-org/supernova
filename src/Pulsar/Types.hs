@@ -1,3 +1,4 @@
+{- End-user types to configure consumers and producers -}
 module Pulsar.Types where
 
 import qualified Data.ByteString.Lazy.Char8    as CL

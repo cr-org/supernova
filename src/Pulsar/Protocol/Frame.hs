@@ -1,3 +1,4 @@
+{- An internal representation of a frame, as specified by the Pulsar protocol: http://pulsar.apache.org/docs/en/develop-binary-protocol -}
 module Pulsar.Protocol.Frame where
 
 import qualified Data.Binary                   as B

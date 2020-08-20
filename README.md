@@ -105,12 +105,13 @@ You should see an output similar to the one below.
 [ Closing Pulsar connection ]
 ```
 
-By default, it logs in DEBUG level. You can change it by using the following alternative:
+By default, it logs to standard out in DEBUG level. You can change it by suppling `LogOptions`.
 
 ```haskell
-import Control.Logging
+logOpts :: LogOptions
+logOpts = LogOptions Info StdOut
 
-runPulsar' LevelInfo resources
+runPulsar' logOpts resources
 ```
 
 ### Streaming

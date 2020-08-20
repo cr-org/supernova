@@ -1,6 +1,9 @@
 {-# LANGUAGE FlexibleInstances, LambdaCase #-}
 
-module Pulsar.Protocol.Decoder where
+{- A decoder that understands the Pulsar protocol, as specified at: http://pulsar.apache.org/docs/en/develop-binary-protocol -}
+module Pulsar.Protocol.Decoder (
+  decodeBaseCommand
+) where
 
 import           Control.Monad                  ( unless )
 import qualified Data.Binary.Get               as B
