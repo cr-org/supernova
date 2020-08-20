@@ -105,7 +105,7 @@ You should see an output similar to the one below.
 [ Closing Pulsar connection ]
 ```
 
-By default, it logs to standard out in DEBUG level. You can change it by suppling `LogOptions`.
+By default, it logs to the standard output in DEBUG level. You can change it by suppling `LogOptions`.
 
 ```haskell
 logOpts :: LogOptions

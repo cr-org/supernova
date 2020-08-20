@@ -1,4 +1,12 @@
-{- End-user types to configure consumers and producers -}
+{-|
+Module      : Pulsar.Types
+Description : End-user Pulsar API types.
+License     : Apache-2.0
+Maintainer  : gabriel.volpe@chatroulette.com
+Stability   : experimental
+
+End-user types to configure consumers and producers.
+-}
 module Pulsar.Types where
 
 import qualified Data.ByteString.Lazy.Char8    as CL
@@ -7,8 +15,7 @@ import           Data.String
 import qualified Data.Text                     as T
 import           Proto.PulsarApi                ( MessageIdData )
 
-------- Topic ---------
-
+{- | A Topic is in the form "type://tenant/namespace/topic-name", which is what the 'Show' instance does. -}
 data Topic = Topic
   { type' :: TopicType
   , tenant :: Tenant
@@ -16,6 +23,7 @@ data Topic = Topic
   , name :: TopicName
   }
 
+{- | A default 'Topic': "non-persistent://public/default/my-topic". -}
 defaultTopic :: String -> Topic
 defaultTopic n = Topic { type'     = NonPersistent
                        , tenant    = Tenant "public"

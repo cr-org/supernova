@@ -1,6 +1,5 @@
 {-# LANGUAGE LambdaCase, OverloadedStrings #-}
 
-{- Defines a high-level Pulsar consumer for the end user -}
 module Pulsar.Consumer where
 
 import           Control.Monad                  ( forever )
@@ -22,11 +21,13 @@ import           UnliftIO.Concurrent            ( forkIO
                                                 , killThread
                                                 )
 
+{- | An abstract 'Consumer' able to 'fetch' messages of type 'a' and 'ack'nowledge them. -}
 data Consumer m a = Consumer
   { fetch :: m a
   , ack :: MsgId -> m ()
   }
 
+{- | Create a new 'Consumer' by supplying a 'PulsarCtx' (returned by 'Pulsar.connect'), a 'Topic' and a 'SubscriptionName'. -}
 newConsumer
   :: (MonadManaged m, MonadIO f)
   => PulsarCtx

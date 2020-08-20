@@ -23,16 +23,16 @@ custom-setup
 
 library
   exposed-modules:     Pulsar
-                     , Pulsar.Consumer
-                     , Pulsar.Producer
   other-modules:       Paths_hpulsar
                      , Proto.PulsarApi
                      , Proto.PulsarApi_Fields
                      , Pulsar.Core
                      , Pulsar.Connection
+                     , Pulsar.Consumer
                      , Pulsar.Internal.Core
                      , Pulsar.Internal.Logger
                      , Pulsar.Internal.TCPClient
+                     , Pulsar.Producer
                      , Pulsar.Protocol.Commands
                      , Pulsar.Protocol.Decoder
                      , Pulsar.Protocol.Encoder

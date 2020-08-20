@@ -7,16 +7,17 @@ import qualified Control.Logging               as L
 import           Control.Monad.Catch
 import           Control.Monad.Managed
 
+{- | The main Pulsar monad, which abstracts over a 'Managed' monad. -}
 newtype Pulsar a = Pulsar (Managed a)
   deriving (Functor, Applicative, Monad, MonadIO, MonadManaged, MonadThrow)
 
-{- Runs a Pulsar computation with default logging to standard output -}
+{- | Runs a Pulsar computation with default logging to standard output -}
 runPulsar :: forall a b . Pulsar a -> (a -> IO b) -> IO b
 runPulsar (Pulsar mgd) f = do
   L.setLogTimeFormat "%H:%M:%S%Q"
   L.withStdoutLogging $ with mgd f
 
-{- Runs a Pulsar computation with the supplied logging options -}
+{- | Runs a Pulsar computation with the supplied logging options -}
 runPulsar' :: forall a b . LogOptions -> Pulsar a -> (a -> IO b) -> IO b
 runPulsar' (LogOptions lvl out) (Pulsar mgd) f = do
   L.setLogLevel $ convertLogLevel lvl
@@ -31,7 +32,7 @@ instance MonadThrow Managed where
 data LogOptions = LogOptions
   { logLevel :: LogLevel
   , logOutput :: LogOutput
-  }
+  } deriving Show
 
 data LogLevel = Error | Warn | Info | Debug deriving Show
 data LogOutput = StdOut | File FilePath deriving Show

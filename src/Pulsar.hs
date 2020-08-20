@@ -1,4 +1,12 @@
-{- TODO: Write documentation once the API is stable enough -}
+{-|
+Module      : Pulsar
+Description : Apache Pulsar client
+License     : Apache-2.0
+Maintainer  : gabriel.volpe@chatroulette.com
+Stability   : experimental
+
+Apache Pulsar client that implements the required TCP protocol. Acquire a connection and create as many consumers and producers as you need.
+-}
 module Pulsar
   ( ConnectData
   , Consumer(..)

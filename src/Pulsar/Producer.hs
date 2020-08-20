@@ -11,6 +11,7 @@ import           Pulsar.Connection
 import           Pulsar.Types
 import           UnliftIO.Chan
 
+{- | An abstract 'Producer' able to 'produce' messages of type 'PulsarMessage'. -}
 newtype Producer m = Producer
   { produce :: PulsarMessage -> m ()
   }
@@ -25,6 +26,7 @@ mkSeqId ref = liftIO $ atomicModifyIORef
   ref
   (\(ProducerState s n) -> let s' = s + 1 in (ProducerState s' n, s))
 
+{- | Create a new 'Producer' by supplying a 'PulsarCtx' (returned by 'Pulsar.connect') and a 'Topic'. -}
 newProducer
   :: (MonadManaged m, MonadIO f) => PulsarCtx -> Topic -> m (Producer f)
 newProducer (Ctx conn app) topic = do
