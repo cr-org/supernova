@@ -40,7 +40,7 @@ topic = defaultTopic "app"
 
 demo :: IO ()
 demo = runPulsar resources $ \(Consumer {..}, Producer {..}) ->
-  let c = forever $ fetch >>= \(Message i p) -> msgDecoder p >> ack i
+  let c = forever $ fetch >>= \(Message i m) -> msgDecoder m >> ack i
       p = forever $ sleep 5 >> traverse_ produce messages
   in  concurrently_ c p
 
@@ -59,6 +59,6 @@ logOpts = LogOptions Info StdOut
 
 streamDemo :: IO ()
 streamDemo = runPulsar' logOpts resources $ \(Consumer {..}, Producer {..}) ->
-  let c = forever $ fetch >>= \(Message i p) -> msgDecoder p >> ack i
+  let c = forever $ fetch >>= \(Message i m) -> msgDecoder m >> ack i
       p = forever $ sleep 5 >> traverse_ produce messages
   in  S.drain . asyncly . maxThreads 10 $ S.yieldM c <> S.yieldM p

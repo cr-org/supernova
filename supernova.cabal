@@ -3,14 +3,14 @@ cabal-version:       2.4
 name:                supernova
 version:             0.1.0.0
 synopsis:            Apache Pulsar client for Haskell
--- description:
--- bug-reports:
+description:         Create Consumers and Producers to interact with a Pulsar broker.
+homepage:            https://github.com/cr-org/supernova
+bug-reports:         https://github.com/cr-org/supernova/issues
 license:             Apache-2.0
 license-file:        LICENSE
 author:              Gabriel Volpe
 maintainer:          gabriel.volpe@chatroulette.com
--- copyright:
--- category:
+category:            Network
 build-type:          Custom
 extra-source-files:  README.md
                    , src/pulsar_api.proto
@@ -19,7 +19,6 @@ custom-setup
   setup-depends:       base
                      , Cabal
                      , proto-lens-setup
-  build-tool-depends:  proto-lens-protoc:proto-lens-protoc
 
 library
   exposed-modules:     Pulsar
@@ -38,26 +37,29 @@ library
                      , Pulsar.Protocol.Encoder
                      , Pulsar.Protocol.Frame
                      , Pulsar.Types
-  autogen-modules:     Proto.PulsarApi
+  autogen-modules:     Paths_supernova
+                     , Proto.PulsarApi
                      , Proto.PulsarApi_Fields
-  build-depends:       base
-                     , bifunctor
-                     , binary
-                     , bytestring
-                     , crc32c
-                     , exceptions
-                     , lens-family-core
-                     , logging
-                     , managed
-                     , network
-                     , proto-lens
-                     , proto-lens-runtime
-                     , text
-                     , unliftio
+  build-depends:       base                  >= 4.13.0 && < 4.14,
+                       bifunctor             >= 0.1.0 && < 0.2,
+                       binary                >= 0.8.7 && < 0.9,
+                       bytestring            >= 0.10.10 && < 0.11,
+                       crc32c                >= 0.0.0 && < 0.1,
+                       exceptions            >= 0.10.4 && < 0.11,
+                       lens-family-core      >= 2.0.0 && < 2.1,
+                       logging               >= 3.0.5 && < 3.1,
+                       text                  >= 1.2.4 && < 1.3,
+                       managed               >= 1.0.7 && < 1.1,
+                       network               >= 3.1.2 && < 3.2,
+                       proto-lens            >= 0.7.0 && < 0.8,
+                       proto-lens-runtime    >= 0.7.0 && < 0.8,
+                       unliftio              >= 0.2.13 && < 0.3
   hs-source-dirs:      src
   default-language:    Haskell2010
 
-executable supernova
+test-Suite supernova-tests
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
   main-is:             Main.hs
   build-depends:       base
                      , aeson
@@ -66,5 +68,5 @@ executable supernova
                      , supernova
                      , streamly
                      , text
-  hs-source-dirs:      app
-  default-language:    Haskell2010
+  default-language:     Haskell2010
+  ghc-options:         -Wall -threaded -with-rtsopts -N

@@ -8,7 +8,9 @@ let
       buildTools = old.buildTools or [] ++ [ pkgs.protobuf ];
     }
   );
+
+  supernova = hp.callCabal2nix "supernova" ./. {};
 in
   usingProtobuf (
-    hp.callCabal2nix "supernova" ./. {}
+    pkgs.haskell.lib.dontCheck supernova
   )

@@ -23,7 +23,7 @@ cabal new-build
 
 ### Consumer / Producer example
 
-The example located in `app/Main.hs` showcases a simple consumer / producer program. Having the following data and functions:
+The example located in `test/Main.hs` showcases a simple consumer / producer program. Having the following data and functions:
 
 ```haskell
 data Msg = Msg
@@ -67,7 +67,7 @@ A `Message` contains a `MessageID` you need for `ack`ing and a payload defined a
 Run it with the following command:
 
 ```shell
-cabal new-run
+cabal new-run supernova-tests
 ```
 
 You should see an output similar to the one below.
