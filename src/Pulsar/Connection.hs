@@ -87,7 +87,7 @@ data PulsarCtx = Ctx
   , ctxState :: IORef AppState
   }
 
-{- | Default connection data: `localhost:6650` -}
+{- | Default connection data: "127.0.0.1:6650" -}
 defaultConnectData :: ConnectData
 defaultConnectData = ConnData { connHost = "127.0.0.1", connPort = "6650" }
 

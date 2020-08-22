@@ -1,9 +1,11 @@
-{-# LANGUAGE FlexibleInstances, LambdaCase #-}
+{-# LANGUAGE FlexibleInstances, LambdaCase, OverloadedStrings #-}
 
 {- A decoder that understands the Pulsar protocol, as specified at: http://pulsar.apache.org/docs/en/develop-binary-protocol -}
-module Pulsar.Protocol.Decoder (
-  decodeBaseCommand
-) where
+module Pulsar.Protocol.Decoder
+  ( decodeBaseCommand
+  , dropPayloadGarbage
+  )
+where
 
 import           Control.Monad                  ( unless )
 import qualified Data.Binary.Get               as B
@@ -16,6 +18,11 @@ import qualified Data.ProtoLens.Encoding       as PL
 import           Proto.PulsarApi                ( BaseCommand )
 import           Pulsar.Protocol.Frame
 
+{- These bytes are sent as the payload's prefix from the Java client: https://www.december.com/html/spec/ascii.html -}
+dropPayloadGarbage :: CL.ByteString -> CL.ByteString
+dropPayloadGarbage bs =
+  maybe bs id $ CL.drop 3 <$> CL.stripPrefix "\NUL\NUL\NUL\EOT\CAN" bs
+
 parseFrame :: B.Get Frame
 parseFrame = do
   ts <- B.getInt32be
@@ -27,12 +34,16 @@ parseFrame = do
     False -> parsePayload ts cs simpleCmd
 
 validateCheckSum :: Frame -> B.Get Frame
-validateCheckSum frame@(PayloadFrame _ (PayloadCommand cs ms md pl)) =
-  let metaSize = CL.toStrict (B.runPut $ B.putInt32be ms)
-      metadata = CL.toStrict md
-      payload  = CL.toStrict pl
-      checksum = crc32c $ metaSize <> metadata <> payload
-  in  if checksum == cs then return $! frame else fail "Invalid checksum"
+validateCheckSum frame@(PayloadFrame sc (PayloadCommand cs ms md pl)) =
+  let
+    metaSize = CL.toStrict (B.runPut $ B.putInt32be ms)
+    metadata = CL.toStrict md
+    payload  = CL.toStrict pl
+    checksum = crc32c $ metaSize <> metadata <> payload
+    newFrame =
+      PayloadFrame sc (PayloadCommand cs ms md (dropPayloadGarbage pl))
+  in
+    if checksum == cs then return $! newFrame else fail "Invalid checksum"
 validateCheckSum x = return $! x
 
 parsePayload :: Int32 -> Int32 -> SimpleCmd -> B.Get Frame

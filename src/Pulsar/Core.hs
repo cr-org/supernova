@@ -62,7 +62,6 @@ closeProducer :: Connection -> Chan Response -> ReqId -> ProducerId -> IO ()
 closeProducer (Conn s) chan r@(ReqId req) (PId pid) = do
   logRequest $ P.closeProducer req pid
   sendSimpleCmd s $ P.closeProducer req pid
-  -- TODO: we may need to check for failure too
   void $ verifyResponse r chan F.maybe'success
 
 newSubscriber
@@ -93,9 +92,12 @@ closeConsumer :: Connection -> Chan Response -> ReqId -> ConsumerId -> IO ()
 closeConsumer (Conn s) chan r@(ReqId req) (CId cid) = do
   logRequest $ P.closeConsumer req cid
   sendSimpleCmd s $ P.closeConsumer req cid
-  -- TODO: we may need to check for failure too
-  -- FIXME: the response for close consumer never comes on a SIGTERM
-  void $ verifyResponse r chan F.maybe'success
+  -- FIXME: this is a workaround but the problem is the response for close consumer never comes on a SIGTERM when consuming
+  -- from the Chan, since the writer gets interrupted and no messages come in.
+  resp <- receive s
+  case getCommand resp ^. F.maybe'success of
+    Just _  -> logResponse resp
+    Nothing -> return ()
 
 ------ Keep Alive -------
 
