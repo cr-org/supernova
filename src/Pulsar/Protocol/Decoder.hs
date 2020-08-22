@@ -18,7 +18,14 @@ import qualified Data.ProtoLens.Encoding       as PL
 import           Proto.PulsarApi                ( BaseCommand )
 import           Pulsar.Protocol.Frame
 
-{- These bytes are sent as the payload's prefix from the Java client: https://www.december.com/html/spec/ascii.html -}
+{-
+ - These 5 bytes are part of a total of 8 bytes sent as the payload's prefix from the Java client.
+ - Apparently that's how Google's FlatBuffers serialize data: https://google.github.io/flatbuffers/
+ -
+ - Source: https://github.com/apache/pulsar/blob/master/pulsar-io/kinesis/src/main/java/org/apache/pulsar/io/kinesis/fbs/Message.java#L22
+ -
+ - More info on the Ascii spec: https://www.december.com/html/spec/ascii.html. Maybe this could be helpful: https://hackage.haskell.org/package/flatbuffers
+ -}
 dropPayloadGarbage :: CL.ByteString -> CL.ByteString
 dropPayloadGarbage bs =
   maybe bs id $ CL.drop 3 <$> CL.stripPrefix "\NUL\NUL\NUL\EOT\CAN" bs
