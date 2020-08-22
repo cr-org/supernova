@@ -93,7 +93,6 @@ send pid sid = defMessage
  where
   sendCmd :: CommandSend
   sendCmd = defMessage
-    & F.numMessages .~ 1
     & F.producerId .~ pid
     & F.sequenceId .~ sid
 

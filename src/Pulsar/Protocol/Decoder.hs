@@ -28,7 +28,7 @@ import           Pulsar.Protocol.Frame
  -}
 dropPayloadGarbage :: CL.ByteString -> CL.ByteString
 dropPayloadGarbage bs =
-  maybe bs id $ CL.drop 3 <$> CL.stripPrefix "\NUL\NUL\NUL\EOT\CAN" bs
+  maybe bs (CL.drop 3) (CL.stripPrefix "\NUL\NUL\NUL\EOT\CAN" bs)
 
 parseFrame :: B.Get Frame
 parseFrame = do

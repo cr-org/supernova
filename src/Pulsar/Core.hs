@@ -8,7 +8,6 @@ import           Control.Monad.Catch            ( MonadThrow )
 import           Control.Monad.IO.Class
 import qualified Data.Binary                   as B
 import           Data.Functor                   ( void )
-import           Data.Maybe                     ( maybe )
 import           Data.ProtoLens.Field           ( HasField )
 import           Data.Text                      ( Text )
 import           Lens.Family
