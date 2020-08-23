@@ -7,8 +7,6 @@ module Pulsar.Protocol.Encoder
 where
 
 import qualified Data.Binary.Put               as B
-import qualified Data.ByteString.Lazy          as BL
-import qualified Data.ByteString.Char8         as C
 import qualified Data.ByteString.Lazy.Char8    as CL
 import           Data.Digest.CRC32C             ( crc32c )
 import           Data.Int                       ( Int32 )

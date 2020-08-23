@@ -8,16 +8,12 @@ import           Control.Monad.Managed
 import qualified Data.Binary                   as B
 import           Data.Foldable                  ( traverse_ )
 import           Data.IORef
-import           Data.Text                      ( Text )
 import           Lens.Family
 import qualified Network.Socket                as NS
 import qualified Network.Socket.ByteString.Lazy
                                                as SBL
 import           Proto.PulsarApi                ( BaseCommand
-                                                , CommandMessage
-                                                , CommandPong
                                                 , MessageMetadata
-                                                , MessageIdData
                                                 )
 import qualified Proto.PulsarApi_Fields        as F
 import           Pulsar.Internal.Logger
@@ -95,13 +91,12 @@ defaultConnectData = ConnData { connHost = "127.0.0.1", connPort = "6650" }
 connect
   :: (MonadThrow m, MonadIO m, MonadManaged m) => ConnectData -> m PulsarCtx
 connect (ConnData h p) = do
-  socket     <- acquireSocket h p
-  socketChan <- liftIO newChan
+  socket <- acquireSocket h p
   liftIO $ sendSimpleCmd socket P.connect
   resp <- receive socket
   case getCommand resp ^. F.maybe'connected of
-    Just res -> logResponse resp
-    Nothing  -> throwIO $ userError "Could not connect"
+    Just _  -> logResponse resp
+    Nothing -> throwIO $ userError "Could not connect"
   app   <- liftIO initAppState
   kchan <- liftIO newChan
   let ctx        = Ctx (Conn socket) app
@@ -118,8 +113,8 @@ recvDispatch s ref chan = forever $ do
   resp                   <- receive s
   (AppState cs _ ps _ _) <- liftIO $ readIORef ref
   case getCommand resp ^. F.maybe'pong of
-    Just pong -> writeChan chan (getCommand resp)
-    Nothing   -> traverse_ (`writeChan` resp) ((snd <$> cs) ++ (snd <$> ps))
+    Just _  -> writeChan chan (getCommand resp)
+    Nothing -> traverse_ (`writeChan` resp) ((snd <$> cs) ++ (snd <$> ps))
 
 {- Emit a PING and expect a PONG every 29 seconds. If a PONG is not received, interrupt connection -}
 keepAlive :: MonadIO m => NS.Socket -> Chan BaseCommand -> m ()
@@ -151,7 +146,7 @@ receive s = liftIO $ do
   case decodeBaseCommand msg of
     Left  e    -> fail $ "Decoding error: " <> e
     Right resp -> case getCommand resp ^. F.maybe'ping of
-      Just p -> do
+      Just _ -> do
         logResponse $ getCommand resp
         logRequest P.pong
         sendSimpleCmd s P.pong

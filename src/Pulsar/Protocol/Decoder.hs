@@ -15,7 +15,6 @@ import           Data.Digest.CRC32C             ( crc32c )
 import           Data.Bifunctor                 ( bimap )
 import           Data.Int                       ( Int32 )
 import qualified Data.ProtoLens.Encoding       as PL
-import           Proto.PulsarApi                ( BaseCommand )
 import           Pulsar.Protocol.Frame
 
 {-
@@ -41,16 +40,15 @@ parseFrame = do
     False -> parsePayload ts cs simpleCmd
 
 validateCheckSum :: Frame -> B.Get Frame
-validateCheckSum frame@(PayloadFrame sc (PayloadCommand cs ms md pl)) =
+validateCheckSum (PayloadFrame sc (PayloadCommand cs ms md pl)) =
   let
     metaSize = CL.toStrict (B.runPut $ B.putInt32be ms)
     metadata = CL.toStrict md
     payload  = CL.toStrict pl
     checksum = crc32c $ metaSize <> metadata <> payload
-    newFrame =
-      PayloadFrame sc (PayloadCommand cs ms md (dropPayloadGarbage pl))
+    frame    = PayloadFrame sc (PayloadCommand cs ms md (dropPayloadGarbage pl))
   in
-    if checksum == cs then return $! newFrame else fail "Invalid checksum"
+    if checksum == cs then return $! frame else fail "Invalid checksum"
 validateCheckSum x = return $! x
 
 parsePayload :: Int32 -> Int32 -> SimpleCmd -> B.Get Frame
@@ -77,10 +75,10 @@ decodeBaseCommand bytes = decodeFrame bytes >>= \case
   SimpleFrame s -> do
     cmd <- PL.decodeMessage (CL.toStrict $ frameMessage s)
     return $ SimpleResponse cmd
-  PayloadFrame s (PayloadCommand cs ms md pl) -> do
+  PayloadFrame s (PayloadCommand _ _ md pl) -> do
     cmd  <- PL.decodeMessage . CL.toStrict $ frameMessage s
     meta <- PL.decodeMessage . CL.toStrict $ md
     return $ PayloadResponse cmd meta (payload pl)
    where
-    payload pl | CL.null pl = Nothing
-               | otherwise  = Just $ Payload pl
+    payload p | CL.null p = Nothing
+              | otherwise = Just $ Payload p

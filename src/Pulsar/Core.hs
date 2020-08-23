@@ -37,8 +37,8 @@ verifyResponse r@(ReqId req) chan lens = do
       req'    = view F.requestId <$> cmd'
       rewrite = writeChan chan resp
       loop    = verifyResponse r chan lens
-      checkEq (c, r) | r == req  = cmd' <$ logResponse resp
-                     | otherwise = rewrite >> loop
+      checkEq (_, rq) | rq == req = cmd' <$ logResponse resp
+                      | otherwise = rewrite >> loop
   maybe loop checkEq $ (,) <$> cmd' <*> req'
 
 lookup :: Connection -> Chan Response -> ReqId -> Topic -> IO ()
@@ -88,7 +88,7 @@ ack (Conn s) (CId cid) msgId = do
   sendSimpleCmd s $ P.ack cid msgId
 
 closeConsumer :: Connection -> Chan Response -> ReqId -> ConsumerId -> IO ()
-closeConsumer (Conn s) chan r@(ReqId req) (CId cid) = do
+closeConsumer (Conn s) _ (ReqId req) (CId cid) = do
   logRequest $ P.closeConsumer req cid
   sendSimpleCmd s $ P.closeConsumer req cid
   -- FIXME: this is a workaround but the problem is the response for close consumer never comes on a SIGTERM when consuming
@@ -135,6 +135,6 @@ send (Conn s) chan (PId pid) (SeqId sid) (PulsarMessage msg) = do
         sid'    = view F.sequenceId <$> cmd'
         rewrite = writeChan chan resp
         loop    = confirmReception
-        checkEq (c, p, s) | p == pid && s == sid = logResponse resp
-                          | otherwise            = rewrite >> loop
+        checkEq (_, pd, sd) | pd == pid && sd == sid = logResponse resp
+                            | otherwise              = rewrite >> loop
     maybe loop checkEq $ (,,) <$> cmd' <*> pid' <*> sid'

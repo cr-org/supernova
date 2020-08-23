@@ -5,8 +5,6 @@ module Pulsar.Consumer where
 import           Control.Monad                  ( forever )
 import qualified Control.Monad.Catch           as E
 import           Control.Monad.Managed
-import qualified Data.ByteString.Lazy.Char8    as CL
-import qualified Data.Text                     as T
 import           Lens.Family
 import qualified Proto.PulsarApi_Fields        as F
 import qualified Pulsar.Core                   as C

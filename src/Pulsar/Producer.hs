@@ -3,7 +3,6 @@ module Pulsar.Producer where
 
 import qualified Control.Monad.Catch           as E
 import           Control.Monad.Managed
-import qualified Data.Binary                   as B
 import           Data.IORef
 import           Data.Text                      ( Text )
 import qualified Pulsar.Core                   as C
