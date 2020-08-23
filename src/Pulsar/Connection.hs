@@ -73,11 +73,13 @@ mkRequestId ref = liftIO $ atomicModifyIORef
     let req' = req + 1 in (AppState cs cid ps pid req', req)
   )
 
+{- | Connection details: host and port. -}
 data ConnectData = ConnData
     { connHost :: NS.HostName
     , connPort :: NS.ServiceName
     } deriving Show
 
+{- | Internal Pulsar context. You will never need to access its content (not exported) but might need to take it as argument. -}
 data PulsarCtx = Ctx
   { ctxConn :: Connection
   , ctxState :: IORef AppState

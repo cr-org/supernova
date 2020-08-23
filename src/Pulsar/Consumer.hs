@@ -19,10 +19,10 @@ import           UnliftIO.Concurrent            ( forkIO
                                                 , killThread
                                                 )
 
-{- | An abstract 'Consumer' able to 'fetch' messages of type 'a' and 'ack'nowledge them. -}
-data Consumer m a = Consumer
-  { fetch :: m a
-  , ack :: MsgId -> m ()
+{- | An abstract 'Consumer' able to 'fetch' messages and 'ack'nowledge them. -}
+data Consumer m = Consumer
+  { fetch :: m Message   -- ^ Fetches a single message. Blocks if no messages are available.
+  , ack :: MsgId -> m () -- ^ Acknowledges a single message.
   }
 
 {- | Create a new 'Consumer' by supplying a 'PulsarCtx' (returned by 'Pulsar.connect'), a 'Topic' and a 'SubscriptionName'. -}
@@ -31,8 +31,8 @@ newConsumer
   => PulsarCtx
   -> Topic
   -> SubscriptionName
-  -> m (Consumer f Message)
-newConsumer (Ctx conn@(Conn s) app) topic sub = do
+  -> m (Consumer f)
+newConsumer (Ctx conn app) topic sub = do
   chan  <- newChan
   cid   <- mkConsumerId chan app
   fchan <- newChan
@@ -42,7 +42,7 @@ newConsumer (Ctx conn@(Conn s) app) topic sub = do
       (\i -> newReq >>= \r -> C.closeConsumer conn chan r cid >> killThread i)
     )
  where
-  fetcher app fc = liftIO . forever $ readChan app >>= \case
+  fetcher chan fc = liftIO . forever $ readChan chan >>= \case
     PayloadResponse cmd _ p -> case cmd ^. F.maybe'message of
       Just msg ->
         let msgId = msg ^. F.messageId

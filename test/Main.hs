@@ -44,7 +44,7 @@ demo = runPulsar resources $ \(Consumer {..}, Producer {..}) ->
       p = forever $ sleep 5 >> traverse_ produce messages
   in  concurrently_ c p
 
-resources :: Pulsar (Consumer IO Message, Producer IO)
+resources :: Pulsar (Consumer IO, Producer IO)
 resources = do
   ctx      <- connect defaultConnectData
   consumer <- newConsumer ctx topic "test-sub"

@@ -1,9 +1,9 @@
-cabal-version:       2.4
+cabal-version:       3.0
 
 name:                supernova
 version:             0.0.1
 synopsis:            Apache Pulsar client for Haskell
-description:         Create Consumers and Producers to interact with a Pulsar broker.
+description:         Supernova is an Apache Pulsar client that implements the specified TCP protocol.
 homepage:            https://github.com/cr-org/supernova
 bug-reports:         https://github.com/cr-org/supernova/issues
 license:             Apache-2.0

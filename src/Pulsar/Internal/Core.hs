@@ -9,7 +9,7 @@ import           Control.Monad.Managed
 
 {- | The main Pulsar monad, which abstracts over a 'Managed' monad. -}
 newtype Pulsar a = Pulsar (Managed a)
-  deriving (Functor, Applicative, Monad, MonadIO, MonadManaged, MonadThrow)
+  deriving (Functor, Applicative, Monad, MonadIO, MonadManaged)
 
 {- | Runs a Pulsar computation with default logging to standard output -}
 runPulsar :: forall a b . Pulsar a -> (a -> IO b) -> IO b
@@ -26,15 +26,19 @@ runPulsar' (LogOptions lvl out) (Pulsar mgd) f = do
     StdOut  -> L.withStdoutLogging $ with mgd f
     File fp -> L.withFileLogging fp $ with mgd f
 
-instance MonadThrow Managed where
+instance MonadThrow Pulsar where
   throwM = liftIO . throwM
 
+{- | Internal logging options. Can be used together with `runPulsar'`. -}
 data LogOptions = LogOptions
   { logLevel :: LogLevel
   , logOutput :: LogOutput
   } deriving Show
 
+{- | Internal logging level, part of 'LogOptions'. Can be used together with `runPulsar'`. -}
 data LogLevel = Error | Warn | Info | Debug deriving Show
+
+{- | Internal logging output, part of 'LogOptions'. Can be used together with `runPulsar'`. -}
 data LogOutput = StdOut | File FilePath deriving Show
 
 convertLogLevel :: LogLevel -> L.LogLevel

@@ -12,7 +12,7 @@ import           UnliftIO.Chan
 
 {- | An abstract 'Producer' able to 'produce' messages of type 'PulsarMessage'. -}
 newtype Producer m = Producer
-  { produce :: PulsarMessage -> m ()
+  { produce :: PulsarMessage -> m () -- ^ Produces a single message.
   }
 
 data ProducerState = ProducerState
