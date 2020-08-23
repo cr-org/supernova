@@ -47,7 +47,7 @@ newConsumer (Ctx conn app) topic sub = do
       Just msg ->
         let msgId = msg ^. F.messageId
             pm    = Message (MsgId msgId) $ maybe "" (\(Payload x) -> x) p
-        in  logResponse cmd >> logResponse p >> writeChan fc pm
+        in  logResponse cmd >> writeChan fc pm
       Nothing -> return ()
     _ -> return ()
   newReq = mkRequestId app
