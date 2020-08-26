@@ -9,45 +9,9 @@ A *supernova* is a powerful and luminous stellar explosion. This transient astro
 
 [![supernova](https://www.jpl.nasa.gov/spaceimages/images/largesize/PIA22352_hires.jpg "Kepler Beyond Planets: Finding Exploding Stars (Type Ia Supernova from a White Dwarf Stealing Matter)")](https://www.jpl.nasa.gov/spaceimages/details.php?id=PIA22352)
 
-### Build
+### Quick Start
 
-It is recommended to use [Cachix](https://app.cachix.org/cache/hpulsar) to reduce the compilation time.
-
-```shell
-nix-build
-```
-
-Or within a Nix shell (run `nix-shell` at the project's root).
-
-```shell
-cabal new-build
-```
-
-### Consumer / Producer example
-
-The example located in `test/Main.hs` showcases a simple consumer / producer program. Having the following data and functions:
-
-```haskell
-data Msg = Msg
-  { name :: Text
-  , amount :: Int
-  } deriving (Generic, FromJSON, ToJSON, Show)
-
-messages :: [PulsarMessage]
-messages =
-  let msg = [Msg "foo" 2, Msg "bar" 5, Msg "taz" 1]
-  in  PulsarMessage . encode <$> msg
-
-msgDecoder :: CL.ByteString -> IO ()
-msgDecoder bs =
-  let msg = decode bs :: Maybe Msg
-  in  putStrLn $ "-------- CONSUMED: " <> show msg
-
-topic :: Topic
-topic = defaultTopic "app"
-```
-
-We can run the consumer and producer concurrently (needs the `async` library).
+The example located in `test/Main.hs` showcases a simple consumer and producer running concurrently (needs the `async` library).
 
 ```haskell
 main :: IO ()
@@ -56,7 +20,7 @@ main = runPulsar resources $ \(Consumer {..}, Producer {..}) ->
       p = forever $ sleep 5 >> traverse_ produce messages
   in  concurrently_ c p
 
-resources :: Pulsar (Consumer IO Message, Producer IO)
+resources :: Pulsar (Consumer IO, Producer IO)
 resources = do
   ctx      <- connect defaultConnectData
   consumer <- newConsumer ctx topic "test-sub"
@@ -130,4 +94,18 @@ main = runPulsar resources $ \(Consumer {..}, Producer {..}) ->
   let c = forever $ fetch >>= \(Message i p) -> msgDecoder p >> ack i
       p = forever $ sleep 5 >> traverse_ produce messages
   in  S.drain . asyncly . maxThreads 10 $ S.yieldM c <> S.yieldM p
+```
+
+### Development
+
+It is recommended to use [Cachix](https://app.cachix.org/cache/hpulsar) to reduce the compilation time.
+
+```shell
+nix-build
+```
+
+Or within a Nix shell (run `nix-shell` at the project's root).
+
+```shell
+cabal new-build
 ```
