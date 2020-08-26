@@ -11,14 +11,8 @@ license-file:        LICENSE
 author:              Gabriel Volpe
 maintainer:          gabriel.volpe@chatroulette.com
 category:            Network
-build-type:          Custom
+build-type:          Simple
 extra-source-files:  README.md
-                   , src/pulsar_api.proto
-
-custom-setup
-  setup-depends:       base
-                     , Cabal
-                     , proto-lens-setup
 
 library
   exposed-modules:     Pulsar
@@ -38,8 +32,6 @@ library
                      , Pulsar.Protocol.Frame
                      , Pulsar.Types
   autogen-modules:     Paths_supernova
-                     , Proto.PulsarApi
-                     , Proto.PulsarApi_Fields
   build-depends:       base                  >= 4.13.0 && < 4.14,
                        bifunctor             >= 0.1.0 && < 0.2,
                        binary                >= 0.8.7 && < 0.9,

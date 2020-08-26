@@ -1,0 +1,31 @@
+cabal-version:       3.0
+
+name:                proto
+version:             0.0.1
+license-file:        LICENSE
+author:              Gabriel Volpe
+maintainer:          gabriel.volpe@chatroulette.com
+build-type:          Custom
+extra-source-files:  src/pulsar_api.proto
+
+custom-setup
+  setup-depends:       base
+                     , Cabal
+                     , proto-lens-setup
+
+library
+  other-modules:       Proto.PulsarApi
+                     , Proto.PulsarApi_Fields
+  autogen-modules:     Proto.PulsarApi
+                     , Proto.PulsarApi_Fields
+  hs-source-dirs:      src
+  build-depends:       base                  >= 4.13.0 && < 4.14,
+                       proto-lens            >= 0.7.0 && < 0.8,
+                       proto-lens-runtime    >= 0.7.0 && < 0.8,
+  default-language:    Haskell2010
+
+executable proto
+  main-is:             Main.hs
+  build-depends:       base
+                     , proto
+  default-language:    Haskell2010
