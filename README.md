@@ -11,7 +11,7 @@ A *supernova* is a powerful and luminous stellar explosion. This transient astro
 
 ### Quick Start
 
-The example located in `test/Main.hs` showcases a simple consumer and producer running concurrently (needs the `async` library).
+The example located in `test/Main.hs` showcases a consumer & producer running concurrently (needs the `async` library).
 
 ```haskell
 main :: IO ()
