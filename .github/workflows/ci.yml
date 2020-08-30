@@ -2,6 +2,8 @@ name: Haskell CI
 
 on:
   pull_request:
+    paths:
+      - "lib/**"
   push:
     branches:
       - master

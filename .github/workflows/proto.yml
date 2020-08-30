@@ -2,7 +2,11 @@ name: Proto Gen
 
 on:
   pull_request:
+    paths:
+      - "proto/**"
   push:
+    branches:
+      - master
     paths:
       - "proto/**"
 
