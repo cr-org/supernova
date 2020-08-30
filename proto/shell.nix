@@ -2,17 +2,15 @@ let
   packages = import ./pkgs.nix {};
   inherit (packages) pkgs hp;
 
-  drv = hp.callCabal2nix "supernova" ./. {};
+  drv = hp.callCabal2nix "proto" ./. {};
 in
   {
     my_project = drv;
     shell = hp.shellFor {
-      name = "ghc-shell-for-supernova";
+      name = "ghc-shell-for-proto";
       packages = p: [drv];
       buildInputs = with hp; [
-        brittany
         cabal-install
-        hlint
         pkgs.protobuf
       ];
       shellHook = ''
