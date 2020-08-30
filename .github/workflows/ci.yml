@@ -16,4 +16,7 @@ jobs:
         with:
           name: hpulsar
           signingKey: "${{ secrets.CACHIX_SIGNING_KEY }}"
-      - run: nix-build
+      - name: "Build protobuf generator 🚧"
+        run: cd proto && nix-build && cd ..
+      - name: "Build supernova 🚧"
+        run: cd lib && nix-build
