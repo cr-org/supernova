@@ -1,12 +1,10 @@
-name: Haskell CI
+name: Proto Gen
 
 on:
   pull_request:
   push:
-    branches:
-      - master
     paths:
-      - "lib/**"
+      - "proto/**"
 
 jobs:
   build:
@@ -18,5 +16,5 @@ jobs:
         with:
           name: hpulsar
           signingKey: "${{ secrets.CACHIX_SIGNING_KEY }}"
-      - name: "Build supernova 🚧"
-        run: cd lib && nix-build
+      - name: "Build protobuf generator 🚧"
+        run: cd proto && nix-shell --run "cabal new-build" && cd ..
