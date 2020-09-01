@@ -8,13 +8,14 @@ module Pulsar.Protocol.Decoder
 where
 
 import           Control.Monad                  ( unless )
+import qualified Data.Binary                   as B
 import qualified Data.Binary.Get               as B
 import qualified Data.Binary.Put               as B
 import qualified Data.ByteString.Lazy.Char8    as CL
-import           Data.Digest.CRC32C             ( crc32c )
 import           Data.Bifunctor                 ( bimap )
 import           Data.Int                       ( Int32 )
 import qualified Data.ProtoLens.Encoding       as PL
+import           Pulsar.Protocol.CheckSum
 import           Pulsar.Protocol.Frame
 
 {-
@@ -41,14 +42,10 @@ parseFrame = do
 
 validateCheckSum :: Frame -> B.Get Frame
 validateCheckSum (PayloadFrame sc (PayloadCommand cs ms md pl)) =
-  let
-    metaSize = CL.toStrict (B.runPut $ B.putInt32be ms)
-    metadata = CL.toStrict md
-    payload  = CL.toStrict pl
-    checksum = crc32c $ metaSize <> metadata <> payload
-    frame    = PayloadFrame sc (PayloadCommand cs ms md (dropPayloadGarbage pl))
-  in
-    if checksum == cs then return $! frame else fail "Invalid checksum"
+  case runCheckSum (B.runPut (B.putInt32be ms) <> md <> pl) (CheckSum cs) of
+    Valid -> return
+      $! PayloadFrame sc (PayloadCommand cs ms md (dropPayloadGarbage pl))
+    Invalid -> fail "Invalid checksum"
 validateCheckSum x = return $! x
 
 parsePayload :: Int32 -> Int32 -> SimpleCmd -> B.Get Frame
