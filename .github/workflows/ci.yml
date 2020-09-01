@@ -2,21 +2,22 @@ name: Haskell CI
 
 on:
   pull_request:
-    paths:
-      - "lib/**"
+    paths-ignore:
+      - "proto/**"
   push:
     branches:
       - master
-    paths:
-      - ".github/workflows/**"
-      - "lib/**"
+    paths-ignore:
+      - "proto/**"
 
 jobs:
   build:
     runs-on: ubuntu-18.04
     steps:
       - uses: "actions/checkout@v2.1.0"
-      - uses: "cachix/install-nix-action@v9"
+      - uses: "cachix/install-nix-action@v10"
+        with:
+          skip_adding_nixpkgs_channel: true
       - uses: "cachix/cachix-action@v6"
         with:
           name: hpulsar
