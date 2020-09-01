@@ -26,6 +26,7 @@ library
                      , Pulsar.Internal.Logger
                      , Pulsar.Internal.TCPClient
                      , Pulsar.Producer
+                     , Pulsar.Protocol.CheckSum
                      , Pulsar.Protocol.Commands
                      , Pulsar.Protocol.Decoder
                      , Pulsar.Protocol.Encoder

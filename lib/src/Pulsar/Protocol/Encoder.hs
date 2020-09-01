@@ -8,13 +8,13 @@ where
 
 import qualified Data.Binary.Put               as B
 import qualified Data.ByteString.Lazy.Char8    as CL
-import           Data.Digest.CRC32C             ( crc32c )
 import           Data.Int                       ( Int32 )
 import           Data.Maybe                     ( fromMaybe )
 import qualified Data.ProtoLens.Encoding       as PL
 import           Proto.PulsarApi                ( BaseCommand
                                                 , MessageMetadata
                                                 )
+import           Pulsar.Protocol.CheckSum
 import           Pulsar.Protocol.Frame
 
 mkSimpleCommand :: Int32 -> BaseCommand -> SimpleCmd
@@ -35,12 +35,12 @@ mkPayloadCommand cmd meta (Payload pl) = (simpleCmd, payloadCmd)
   metadata    = PL.encodeMessage meta
   metaSize    = fromIntegral . CL.length . CL.fromStrict $ metadata
   metaSizeBS  = B.runPut . B.putInt32be $ metaSize
-  checksum    = crc32c $ CL.toStrict metaSizeBS <> metadata <> CL.toStrict pl
+  CheckSum cs = computeCheckSum $ metaSizeBS <> CL.fromStrict metadata <> pl
   payloadSize = fromIntegral . CL.length $ pl
   -- frame: extra 14 bytes = 2 (magic number) + 4 (checksum) + 4 (metadata size) + 4 (command size)
   extraBytes  = fromIntegral (14 + metaSize) + payloadSize
   simpleCmd   = mkSimpleCommand extraBytes cmd
-  payloadCmd  = PayloadCommand { frameCheckSum     = checksum
+  payloadCmd  = PayloadCommand { frameCheckSum     = cs
                                , frameMetadataSize = metaSize
                                , frameMetadata     = CL.fromStrict metadata
                                , framePayload      = pl
