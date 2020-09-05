@@ -15,17 +15,19 @@ The example located in `test/Main.hs` showcases a consumer & producer running co
 
 ```haskell
 main :: IO ()
-main = runPulsar resources $ \(Consumer {..}, Producer {..}) ->
-  let c = forever $ fetch >>= \(Message i m) -> msgDecoder m >> ack i
-      p = forever $ sleep 5 >> traverse_ produce messages
-  in  concurrently_ c p
+main = runPulsar conn $ do
+  c <- newConsumer topic "test-sub"
+  p <- newProducer topic
+  liftIO $ program c p
 
-resources :: Pulsar (Consumer IO, Producer IO)
-resources = do
-  ctx      <- connect defaultConnectData
-  consumer <- newConsumer ctx topic "test-sub"
-  producer <- newProducer ctx topic
-  return (consumer, producer)
+conn :: PulsarConnection
+conn = connect defaultConnectData
+
+program :: Consumer IO -> Producer IO -> IO ()
+program (Consumer fetch ack) (Producer send) =
+  let c = forever $ fetch >>= \(Message i m) -> msgDecoder m >> ack i
+      p = forever $ sleep 5 >> traverse_ send messages
+  in  concurrently_ c p
 ```
 
 A `Message` contains a `MessageID` you need for `ack`ing and a payload defined as a lazy `ByteString`.
@@ -36,13 +38,10 @@ Run it with the following command:
 cabal new-run supernova-tests
 ```
 
-By default, it logs to the standard output in DEBUG level. You can change it by suppling `LogOptions`.
+By default, it logs to the standard output in DEBUG level. You can change it by suppling `LogOptions` to the alternative function `runPulsar'`.
 
 ```haskell
-logOpts :: LogOptions
-logOpts = LogOptions Info StdOut
-
-runPulsar' logOpts resources
+runPulsar' :: LogOptions -> PulsarConnection -> Pulsar a -> IO ()
 ```
 
 ### Streaming
@@ -54,9 +53,15 @@ import           Streamly
 import qualified Streamly.Prelude              as S
 
 main :: IO ()
-main = runPulsar resources $ \(Consumer {..}, Producer {..}) ->
-  let c = forever $ fetch >>= \(Message i p) -> msgDecoder p >> ack i
-      p = forever $ sleep 5 >> traverse_ produce messages
+main = runPulsar conn $ do
+  c <- newConsumer topic "test-sub"
+  p <- newProducer topic
+  liftIO $ program c p
+
+program :: Consumer IO -> Producer IO -> IO ()
+program (Consumer fetch ack) (Producer send) =
+  let c = forever $ fetch >>= \(Message i m) -> msgDecoder m >> ack i
+      p = forever $ sleep 5 >> traverse_ send messages
   in  S.drain . asyncly . maxThreads 10 $ S.yieldM c <> S.yieldM p
 ```
 

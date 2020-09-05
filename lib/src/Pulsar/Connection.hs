@@ -2,11 +2,25 @@
 
 module Pulsar.Connection where
 
+import           Control.Concurrent             ( forkIO
+                                                , killThread
+                                                , threadDelay
+                                                )
+import           Control.Concurrent.Async       ( concurrently_ )
+import           Control.Concurrent.Chan
+import           Control.Exception              ( throwIO )
 import           Control.Monad                  ( forever )
-import           Control.Monad.Catch            ( MonadThrow )
-import           Control.Monad.Managed
+import           Control.Monad.Catch            ( MonadThrow
+                                                , bracket
+                                                )
+import           Control.Monad.IO.Class
+import           Control.Monad.Managed          ( MonadManaged
+                                                , Managed
+                                                , managed
+                                                )
 import qualified Data.Binary                   as B
 import           Data.Foldable                  ( traverse_ )
+import           Data.Functor                   ( void )
 import           Data.IORef
 import           Lens.Family
 import qualified Network.Socket                as NS
@@ -27,15 +41,6 @@ import           Pulsar.Protocol.Frame          ( Payload
                                                 , getCommand
                                                 )
 import           System.Timeout                 ( timeout )
-import           UnliftIO.Async                 ( concurrently_ )
-import           UnliftIO.Chan
-import           UnliftIO.Concurrent            ( forkIO
-                                                , killThread
-                                                , threadDelay
-                                                )
-import           UnliftIO.Exception             ( bracket
-                                                , throwIO
-                                                )
 
 newtype Connection = Conn NS.Socket
 
@@ -50,28 +55,34 @@ data AppState = AppState
   , appProducers :: [(ProducerId, Chan Response)] -- a list of producer identifiers associated with a communication channel
   , appProducerId :: ProducerId                   -- an incremental counter to assign unique producer ids
   , appRequestId :: ReqId                         -- an incremental counter to assign unique request ids for all commands
+  , appWorkers :: [Managed ()]                    -- a list of workers for consumers and producers that run in the background
   }
 
 mkConsumerId :: MonadIO m => Chan Response -> IORef AppState -> m ConsumerId
 mkConsumerId chan ref = liftIO $ atomicModifyIORef
   ref
-  (\(AppState cs cid ps pid rid) ->
-    let cid' = cid + 1 in (AppState ((cid', chan) : cs) cid' ps pid rid, cid)
+  (\(AppState cs cid ps pid rid w) ->
+    let cid' = cid + 1 in (AppState ((cid', chan) : cs) cid' ps pid rid w, cid)
   )
 
 mkProducerId :: MonadIO m => Chan Response -> IORef AppState -> m ProducerId
 mkProducerId chan ref = liftIO $ atomicModifyIORef
   ref
-  (\(AppState cs cid ps pid rid) ->
-    let pid' = pid + 1 in (AppState cs cid ((pid', chan) : ps) pid' rid, pid)
+  (\(AppState cs cid ps pid rid w) ->
+    let pid' = pid + 1 in (AppState cs cid ((pid', chan) : ps) pid' rid w, pid)
   )
 
 mkRequestId :: MonadIO m => IORef AppState -> m ReqId
 mkRequestId ref = liftIO $ atomicModifyIORef
   ref
-  (\(AppState cs cid ps pid req) ->
-    let req' = req + 1 in (AppState cs cid ps pid req', req)
+  (\(AppState cs cid ps pid req w) ->
+    let req' = req + 1 in (AppState cs cid ps pid req' w, req)
   )
+
+addWorker :: MonadIO m => IORef AppState -> Managed () -> m ()
+addWorker ref nw = liftIO $ atomicModifyIORef
+  ref
+  (\(AppState cs cid ps pid req w) -> (AppState cs cid ps pid req (nw : w), ()))
 
 {- | Connection details: host and port. -}
 data ConnectData = ConnData
@@ -83,6 +94,7 @@ data ConnectData = ConnData
 data PulsarCtx = Ctx
   { ctxConn :: Connection
   , ctxState :: IORef AppState
+  , ctxHandler :: Managed ()
   }
 
 {- | Default connection data: "127.0.0.1:6650" -}
@@ -91,40 +103,43 @@ defaultConnectData = ConnData { connHost = "127.0.0.1", connPort = "6650" }
 
 {- | Starts a Pulsar connection with the supplied 'ConnectData' -}
 connect
-  :: (MonadThrow m, MonadIO m, MonadManaged m) => ConnectData -> m PulsarCtx
+  :: (MonadIO m, MonadThrow m, MonadManaged m) => ConnectData -> m PulsarCtx
 connect (ConnData h p) = do
   socket <- acquireSocket h p
   liftIO $ sendSimpleCmd socket P.connect
+  checkConnection socket
+  app   <- liftIO initAppState
+  kchan <- liftIO newChan
+  let dispatcher  = recvDispatch socket app kchan
+      task        = concurrently_ dispatcher (keepAlive socket kchan)
+      connHandler = void $ managed (bracket (forkIO task) killThread)
+  return $ Ctx (Conn socket) app connHandler
+
+checkConnection :: (MonadIO m, MonadThrow m) => NS.Socket -> m ()
+checkConnection socket = do
   resp <- receive socket
   case getCommand resp ^. F.maybe'connected of
     Just _  -> logResponse resp
-    Nothing -> throwIO $ userError "Could not connect"
-  app   <- liftIO initAppState
-  kchan <- liftIO newChan
-  let ctx        = Ctx (Conn socket) app
-      dispatcher = recvDispatch socket app kchan
-      task       = concurrently_ dispatcher (keepAlive socket kchan)
-  using $ ctx <$ managed (bracket (forkIO task) killThread)
+    Nothing -> liftIO . throwIO $ userError "Could not connect"
 
 initAppState :: MonadIO m => m (IORef AppState)
-initAppState = liftIO . newIORef $ AppState [] 0 [] 0 0
+initAppState = liftIO . newIORef $ AppState [] 0 [] 0 0 []
 
-recvDispatch
-  :: MonadIO m => NS.Socket -> IORef AppState -> Chan BaseCommand -> m ()
+recvDispatch :: NS.Socket -> IORef AppState -> Chan BaseCommand -> IO ()
 recvDispatch s ref chan = forever $ do
-  resp                   <- receive s
-  (AppState cs _ ps _ _) <- liftIO $ readIORef ref
+  resp                     <- receive s
+  (AppState cs _ ps _ _ _) <- readIORef ref
   case getCommand resp ^. F.maybe'pong of
     Just _  -> writeChan chan (getCommand resp)
     Nothing -> traverse_ (`writeChan` resp) ((snd <$> cs) ++ (snd <$> ps))
 
 {- Emit a PING and expect a PONG every 29 seconds. If a PONG is not received, interrupt connection -}
-keepAlive :: MonadIO m => NS.Socket -> Chan BaseCommand -> m ()
+keepAlive :: NS.Socket -> Chan BaseCommand -> IO ()
 keepAlive s chan = forever $ do
   threadDelay (29 * 1000000)
   logRequest P.ping
   sendSimpleCmd s P.ping
-  liftIO $ timeout (2 * 1000000) (readChan chan) >>= \case
+  timeout (2 * 1000000) (readChan chan) >>= \case
     Just cmd -> logResponse cmd
     Nothing  -> throwIO (userError "Keep Alive interruption")
 
