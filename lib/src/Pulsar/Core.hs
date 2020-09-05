@@ -3,6 +3,7 @@
 {- Defines a set of transactional commands, communicating via internal channels -}
 module Pulsar.Core where
 
+import           Control.Concurrent.Chan
 import           Control.Exception              ( throwIO )
 import           Control.Monad.Catch            ( MonadThrow )
 import           Control.Monad.IO.Class
@@ -21,7 +22,6 @@ import           Pulsar.Protocol.Frame          ( Payload(..)
                                                 , getCommand
                                                 )
 import           Pulsar.Types
-import           UnliftIO.Chan
 
 ------ Simple commands ------
 
@@ -57,8 +57,8 @@ newProducer (Conn s) chan r@(ReqId req) (PId pid) topic = do
     Just ps -> return $ ps ^. F.producerName
     Nothing -> return ""
 
-closeProducer :: Connection -> Chan Response -> ReqId -> ProducerId -> IO ()
-closeProducer (Conn s) chan r@(ReqId req) (PId pid) = do
+closeProducer :: Connection -> Chan Response -> ProducerId -> ReqId -> IO ()
+closeProducer (Conn s) chan (PId pid) r@(ReqId req) = do
   logRequest $ P.closeProducer req pid
   sendSimpleCmd s $ P.closeProducer req pid
   void $ verifyResponse r chan F.maybe'success
@@ -87,8 +87,8 @@ ack (Conn s) (CId cid) msgId = do
   logRequest $ P.ack cid msgId
   sendSimpleCmd s $ P.ack cid msgId
 
-closeConsumer :: Connection -> Chan Response -> ReqId -> ConsumerId -> IO ()
-closeConsumer (Conn s) _ (ReqId req) (CId cid) = do
+closeConsumer :: Connection -> Chan Response -> ConsumerId -> ReqId -> IO ()
+closeConsumer (Conn s) _ (CId cid) (ReqId req) = do
   logRequest $ P.closeConsumer req cid
   sendSimpleCmd s $ P.closeConsumer req cid
   -- FIXME: this is a workaround but the problem is the response for close consumer never comes on a SIGTERM when consuming
@@ -104,7 +104,7 @@ ping :: (MonadThrow m, MonadIO m) => Connection -> Chan Response -> m ()
 ping (Conn s) chan = do
   logRequest P.ping
   sendSimpleCmd s P.ping
-  cmd <- getCommand <$> readChan chan
+  cmd <- getCommand <$> liftIO (readChan chan)
   case cmd ^. F.maybe'pong of
     Just p  -> logResponse p
     Nothing -> liftIO . throwIO $ userError "Failed to get PONG"

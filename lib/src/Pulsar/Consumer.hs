@@ -1,10 +1,21 @@
-{-# LANGUAGE LambdaCase, OverloadedStrings #-}
+{-# LANGUAGE FlexibleContexts, LambdaCase, OverloadedStrings #-}
 
 module Pulsar.Consumer where
 
+import           Control.Concurrent             ( forkIO
+                                                , killThread
+                                                )
+import           Control.Concurrent.Chan
 import           Control.Monad                  ( forever )
-import qualified Control.Monad.Catch           as E
-import           Control.Monad.Managed
+import           Control.Monad.Catch            ( bracket )
+import           Control.Monad.IO.Class         ( MonadIO
+                                                , liftIO
+                                                )
+import           Control.Monad.Managed          ( managed )
+import           Control.Monad.Reader           ( MonadReader
+                                                , ask
+                                                )
+import           Data.Functor                   ( void )
 import           Lens.Family
 import qualified Proto.PulsarApi_Fields        as F
 import qualified Pulsar.Core                   as C
@@ -14,10 +25,6 @@ import           Pulsar.Protocol.Frame          ( Payload(..)
                                                 , Response(..)
                                                 )
 import           Pulsar.Types
-import           UnliftIO.Chan
-import           UnliftIO.Concurrent            ( forkIO
-                                                , killThread
-                                                )
 
 {- | An abstract 'Consumer' able to 'fetch' messages and 'ack'nowledge them. -}
 data Consumer m = Consumer
@@ -27,22 +34,22 @@ data Consumer m = Consumer
 
 {- | Create a new 'Consumer' by supplying a 'PulsarCtx' (returned by 'Pulsar.connect'), a 'Topic' and a 'SubscriptionName'. -}
 newConsumer
-  :: (MonadManaged m, MonadIO f)
-  => PulsarCtx
-  -> Topic
+  :: (MonadIO m, MonadIO f, MonadReader PulsarCtx m)
+  => Topic
   -> SubscriptionName
   -> m (Consumer f)
-newConsumer (Ctx conn app) topic sub = do
-  chan  <- newChan
-  cid   <- mkConsumerId chan app
-  fchan <- newChan
-  using $ Consumer (readChan fchan) (acker cid) <$ managed
-    (E.bracket
-      (mkSubscriber chan cid >> forkIO (fetcher chan fchan))
-      (\i -> newReq >>= \r -> C.closeConsumer conn chan r cid >> killThread i)
-    )
+newConsumer topic sub = do
+  (Ctx conn app _) <- ask
+  chan             <- liftIO newChan
+  cid              <- mkConsumerId chan app
+  fchan            <- liftIO newChan
+  let acquire = mkSubscriber conn chan cid app >> forkIO (fetcher chan fchan)
+      release = (newReq app >>= C.closeConsumer conn chan cid >>) . killThread
+      handler = void $ managed (bracket acquire release)
+  addWorker app handler
+  return $ Consumer (liftIO $ readChan fchan) (acker conn cid)
  where
-  fetcher chan fc = liftIO . forever $ readChan chan >>= \case
+  fetcher chan fc = forever $ readChan chan >>= \case
     PayloadResponse cmd _ p -> case cmd ^. F.maybe'message of
       Just msg ->
         let msgId = msg ^. F.messageId
@@ -50,11 +57,11 @@ newConsumer (Ctx conn app) topic sub = do
         in  logResponse cmd >> writeChan fc pm
       Nothing -> return ()
     _ -> return ()
-  newReq = mkRequestId app
-  acker cid (MsgId mid) = liftIO $ C.ack conn cid mid
-  mkSubscriber chan cid = do
-    req1 <- newReq
+  newReq app = mkRequestId app
+  acker conn cid (MsgId mid) = liftIO $ C.ack conn cid mid
+  mkSubscriber conn chan cid app = do
+    req1 <- newReq app
     C.lookup conn chan req1 topic
-    req2 <- newReq
+    req2 <- newReq app
     C.newSubscriber conn chan req2 cid topic sub
     C.flow conn cid

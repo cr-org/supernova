@@ -6,6 +6,7 @@ module Main where
 import           Control.Concurrent             ( threadDelay )
 import           Control.Concurrent.Async       ( concurrently_ )
 import           Control.Monad                  ( forever )
+import           Control.Monad.IO.Class         ( liftIO )
 import           Data.Aeson
 import qualified Data.ByteString.Lazy.Char8    as CL
 import           Data.Foldable                  ( traverse_ )
@@ -39,17 +40,22 @@ topic :: Topic
 topic = defaultTopic "app"
 
 demo :: IO ()
-demo = runPulsar resources $ \(Consumer {..}, Producer {..}) ->
-  let c = forever $ fetch >>= \(Message i m) -> msgDecoder m >> ack i
-      p = forever $ sleep 5 >> traverse_ produce messages
-  in  concurrently_ c p
+demo = runPulsar conn pulsar
 
-resources :: Pulsar (Consumer IO, Producer IO)
-resources = do
-  ctx      <- connect defaultConnectData
-  consumer <- newConsumer ctx topic "test-sub"
-  producer <- newProducer ctx topic
-  return (consumer, producer)
+conn :: PulsarConnection
+conn = connect defaultConnectData
+
+pulsar :: Pulsar ()
+pulsar = do
+  c <- newConsumer topic "test-sub"
+  p <- newProducer topic
+  liftIO $ program c p
+
+program :: Consumer IO -> Producer IO -> IO ()
+program (Consumer fetch ack) (Producer send) =
+  let c = forever $ fetch >>= \(Message i m) -> msgDecoder m >> ack i
+      p = forever $ sleep 5 >> traverse_ send messages
+  in  concurrently_ c p
 
 sleep :: Int -> IO ()
 sleep n = threadDelay (n * 1000000)
@@ -58,7 +64,13 @@ logOpts :: LogOptions
 logOpts = LogOptions Info StdOut
 
 streamDemo :: IO ()
-streamDemo = runPulsar' logOpts resources $ \(Consumer {..}, Producer {..}) ->
+streamDemo = runPulsar' logOpts conn $ do
+  c <- newConsumer topic "test-sub"
+  p <- newProducer topic
+  liftIO $ streamProgram c p
+
+streamProgram :: Consumer IO -> Producer IO -> IO ()
+streamProgram (Consumer fetch ack) (Producer send) =
   let c = forever $ fetch >>= \(Message i m) -> msgDecoder m >> ack i
-      p = forever $ sleep 5 >> traverse_ produce messages
+      p = forever $ sleep 5 >> traverse_ send messages
   in  S.drain . asyncly . maxThreads 10 $ S.yieldM c <> S.yieldM p
