@@ -39,9 +39,11 @@ And the main user program that consume and produce messages concurrently, runnin
 program :: Consumer IO -> Producer IO -> IO ()
 program Consumer {..} Producer {..} =
   let c = forever $ fetch >>= \(Message i m) -> print m >> ack i
-      p = forever $ send "Hello World!" >> threadDelay (5 * 1000000)
+      p = forever $ threadDelay (5 * 1000000) >> send "Hello World!"
   in  concurrently_ c p
 @
+
+We have a delay of 5 seconds before publishing to make sure the consumer is already running. Otherwise, it might miss some messages.
 
 Finally, we put it all together and call 'runPulsar' with the connection and the program in the 'Pulsar' monad.
 

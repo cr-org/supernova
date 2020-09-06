@@ -26,11 +26,13 @@ conn = connect defaultConnectData
 program :: Consumer IO -> Producer IO -> IO ()
 program Consumer {..} Producer {..} =
   let c = forever $ fetch >>= \(Message i m) -> msgDecoder m >> ack i
-      p = forever $ traverse_ send messages >> sleep 5
+      p = forever $ sleep 5 >> traverse_ send messages
   in  concurrently_ c p
 ```
 
 A `Message` contains a `MessageID` you need for `ack`ing and a payload defined as a lazy `ByteString`.
+
+> Note that we wait a few seconds before publishing a message to make sure the consumer is already subscribed. Otherwise, it might miss some messages.
 
 Run it with the following command:
 
@@ -55,7 +57,7 @@ import qualified Streamly.Prelude              as S
 program :: Consumer IO -> Producer IO -> IO ()
 program Consumer {..} Producer {..} =
   let c = forever $ fetch >>= \(Message i m) -> msgDecoder m >> ack i
-      p = forever $ traverse_ send messages >> sleep 5
+      p = forever $ sleep 5 >> traverse_ send messages
   in  S.drain . asyncly . maxThreads 10 $ S.yieldM c <> S.yieldM p
 ```
 

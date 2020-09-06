@@ -49,7 +49,7 @@ newConsumer topic sub = do
   fchan            <- liftIO newChan
   var              <- liftIO newEmptyMVar
   let acquire = mkSubscriber conn chan cid app >> forkIO (fetcher chan fchan)
-      release = (newReq app >>= C.closeConsumer conn chan cid >>) . killThread
+      release i = killThread i >> newReq app >>= C.closeConsumer conn chan cid
       handler = managed (bracket acquire release) >> liftIO (readMVar var)
   worker <- liftIO $ async (runManaged $ void handler)
   addWorker app (worker, var)
