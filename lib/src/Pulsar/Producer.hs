@@ -3,12 +3,16 @@
 {- Defines a high-level Pulsar producer for the end user -}
 module Pulsar.Producer where
 
+import           Control.Concurrent.Async       ( async )
 import           Control.Concurrent.Chan
 import           Control.Monad.Catch            ( bracket_ )
+import           Control.Concurrent.MVar
 import           Control.Monad.IO.Class         ( MonadIO
                                                 , liftIO
                                                 )
-import           Control.Monad.Managed          ( managed_ )
+import           Control.Monad.Managed          ( managed_
+                                                , runManaged
+                                                )
 import           Control.Monad.Reader           ( MonadReader
                                                 , ask
                                                 )
@@ -42,9 +46,11 @@ newProducer topic = do
   pid              <- mkProducerId chan app
   pname            <- liftIO $ mkProducer conn chan pid app
   pst              <- liftIO $ newIORef (ProducerState 0 pname)
+  var              <- liftIO newEmptyMVar
   let release = newReq app >>= C.closeProducer conn chan pid
-      handler = managed_ $ bracket_ (pure ()) release
-  addWorker app handler
+      handler = managed_ (bracket_ (pure ()) release) >> liftIO (readMVar var)
+  worker <- liftIO $ async (runManaged handler)
+  addWorker app (worker, var)
   return $ Producer (dispatch conn chan pid pst)
  where
   newReq app = mkRequestId app

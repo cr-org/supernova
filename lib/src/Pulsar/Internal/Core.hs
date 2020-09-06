@@ -1,23 +1,26 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving, LambdaCase #-}
 
 {- Defines a Pulsar Monad, which wraps a ReaderT and runs internal computations in the background -}
 module Pulsar.Internal.Core where
 
-import           Control.Concurrent             ( forkIO
-                                                , killThread
-                                                , threadDelay
+import           Control.Concurrent             ( killThread )
+import           Control.Concurrent.Async       ( asyncThreadId
+                                                , cancel
                                                 )
 import           Control.Concurrent.MVar
 import qualified Control.Logging               as L
 import           Control.Monad.Catch            ( MonadThrow
+                                                , finally
                                                 , throwM
                                                 )
 import           Control.Monad.Managed
 import           Control.Monad.Reader
+import           Data.Foldable                  ( traverse_ )
 import           Data.IORef                     ( readIORef )
 import           Pulsar.Connection              ( AppState(..)
                                                 , PulsarCtx(..)
                                                 )
+import           System.Timeout                 ( timeout )
 
 {- | Pulsar connection monad, which abstracts over a 'Managed' monad. -}
 newtype Connection a = Connection (Managed a)
@@ -43,18 +46,21 @@ runPulsar' (LogOptions lvl out) (Connection mgd) (Pulsar mr) = do
   L.setLogLevel $ fromLogLevel lvl
   L.setLogTimeFormat "%H:%M:%S%Q"
   case out of
-    StdOut  -> L.withStdoutLogging run
-    File fp -> L.withFileLogging fp run
+    StdOut  -> L.withStdoutLogging runner
+    File fp -> L.withFileLogging fp runner
  where
-  run = runManaged $ do
+  runner = runManaged $ do
     ctx <- mgd
-    ctxHandler ctx
-    var <- liftIO newEmptyMVar
-    tid <- liftIO . forkIO . void $ runReaderT mr ctx >> putMVar var ()
-    liftIO $ threadDelay (1 * 500000) -- FIXME: find a better way to wait for handlers
-    app <- liftIO $ readIORef (ctxState ctx)
-    sequence_ (appWorkers app)
-    liftIO $ readMVar var >> killThread tid
+    void . liftIO $ runReaderT mr ctx `finally` finalizers ctx
+  finalizers ctx = do
+    let (worker, connVar) = ctxConnWorker ctx
+    app <- readIORef (ctxState ctx)
+    traverse_ (\(a, v) -> putMVar v () >> cancelOrKill a) (appWorkers app)
+      `finally` putMVar connVar ()
+    cancel worker
+  cancelOrKill a = timeout (1 * 1000000) (cancel a) >>= \case
+    Just _  -> return ()
+    Nothing -> killThread $ asyncThreadId a
 
 {- | Internal logging options. Can be used together with `runPulsar'`. -}
 data LogOptions = LogOptions

@@ -26,7 +26,7 @@ conn = connect defaultConnectData
 program :: Consumer IO -> Producer IO -> IO ()
 program (Consumer fetch ack) (Producer send) =
   let c = forever $ fetch >>= \(Message i m) -> msgDecoder m >> ack i
-      p = forever $ sleep 5 >> traverse_ send messages
+      p = forever $ traverse_ send messages >> sleep 5
   in  concurrently_ c p
 ```
 
@@ -61,7 +61,7 @@ main = runPulsar conn $ do
 program :: Consumer IO -> Producer IO -> IO ()
 program (Consumer fetch ack) (Producer send) =
   let c = forever $ fetch >>= \(Message i m) -> msgDecoder m >> ack i
-      p = forever $ sleep 5 >> traverse_ send messages
+      p = forever $ traverse_ send messages >> sleep 5
   in  S.drain . asyncly . maxThreads 10 $ S.yieldM c <> S.yieldM p
 ```
 
