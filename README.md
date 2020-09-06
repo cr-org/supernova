@@ -24,7 +24,7 @@ conn :: PulsarConnection
 conn = connect defaultConnectData
 
 program :: Consumer IO -> Producer IO -> IO ()
-program (Consumer fetch ack) (Producer send) =
+program Consumer {..} Producer {..} =
   let c = forever $ fetch >>= \(Message i m) -> msgDecoder m >> ack i
       p = forever $ traverse_ send messages >> sleep 5
   in  concurrently_ c p
@@ -52,14 +52,8 @@ Since both consumers and producers operate on any `MonadIO m`, we could leverage
 import           Streamly
 import qualified Streamly.Prelude              as S
 
-main :: IO ()
-main = runPulsar conn $ do
-  c <- newConsumer topic "test-sub"
-  p <- newProducer topic
-  liftIO $ program c p
-
 program :: Consumer IO -> Producer IO -> IO ()
-program (Consumer fetch ack) (Producer send) =
+program Consumer {..} Producer {..} =
   let c = forever $ fetch >>= \(Message i m) -> msgDecoder m >> ack i
       p = forever $ traverse_ send messages >> sleep 5
   in  S.drain . asyncly . maxThreads 10 $ S.yieldM c <> S.yieldM p
@@ -77,4 +71,17 @@ Or within a Nix shell (run `nix-shell` at the project's root).
 
 ```shell
 cabal new-build
+```
+
+#### Generate Hackage tarball
+
+```shell
+cabal new-sdist
+```
+
+#### Upload documentation
+
+```shell
+cabal new-haddock --haddock-for-hackage --enable-doc
+cabal upload -d dist-newstyle/supernova-0.0.2-docs.tar.gz --publish
 ```

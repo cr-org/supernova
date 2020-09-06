@@ -22,7 +22,7 @@ import qualified Pulsar.Core                   as C
 import           Pulsar.Connection
 import           Pulsar.Types
 
-{- | An abstract 'Producer' able to 'produce' messages of type 'PulsarMessage'. -}
+{- | An abstract 'Producer' able to 'send' messages of type 'PulsarMessage'. -}
 newtype Producer m = Producer
   { send :: PulsarMessage -> m () -- ^ Produces a single message.
   }

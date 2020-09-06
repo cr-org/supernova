@@ -5,6 +5,8 @@ License     : Apache-2.0
 Maintainer  : gabriel.volpe@chatroulette.com
 Stability   : experimental
 
+In the following example, we will create a quick example showcasing a consumer and producer running concurrently, step by step.
+
 Consider the following imports (needs the [async](http://hackage.haskell.org/package/async) library).
 
 @
@@ -14,26 +16,41 @@ import           Control.Monad                  ( forever )
 import           Pulsar
 @
 
-A quick example of a consumer and producer running concurrently.
+Firstly, we create a connection to Pulsar, defined as 'PulsarConnection'.
 
 @
-resources :: Pulsar (Consumer IO, Producer IO)
-resources = do
-  ctx      <- connect defaultConnectData
-  consumer <- newConsumer ctx topic "test-sub"
-  producer <- newProducer ctx topic
-  return (consumer, producer)
+conn :: PulsarConnection
+conn = connect defaultConnectData
 @
 
-A Pulsar connection, consumers, and producers are long-lived resources that are managed accordingly for you. Once the program exits, the resources will be released in the respective order (always opposite to the order of acquisition).
+Then a consumer and a producer, which operate in the 'Pulsar' monad.
+
+@
+pulsar :: Pulsar ()
+pulsar = do
+  c <- newConsumer topic "test-sub"
+  p <- newProducer topic
+  liftIO $ program c p
+@
+
+And the main user program that consume and produce messages concurrently, running in 'IO'.
+
+@
+program :: Consumer IO -> Producer IO -> IO ()
+program Consumer {..} Producer {..} =
+  let c = forever $ fetch >>= \(Message i m) -> print m >> ack i
+      p = forever $ send "Hello World!" >> threadDelay (5 * 1000000)
+  in  concurrently_ c p
+@
+
+Finally, we put it all together and call 'runPulsar' with the connection and the program in the 'Pulsar' monad.
 
 @
 main :: IO ()
-main = runPulsar resources $ \(Consumer {..}, Producer {..}) ->
-  let c = forever $ fetch >>= \(Message i m) -> print m >> ack i
-      p = forever $ threadDelay (5 * 1000000) >> produce "hello world"
-  in  concurrently_ c p
+main = runPulsar conn pulsar
 @
+
+Since a Pulsar connection, consumers, and producers are long-lived resources, Supernova manages them accordingly for you. Once the program exits, the resources will be released in the respective order (always opposite to the order of acquisition).
 -}
 module Pulsar
   ( connect
