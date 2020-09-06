@@ -3,10 +3,7 @@
 {- Defines a Pulsar Monad, which wraps a ReaderT and runs internal computations in the background -}
 module Pulsar.Internal.Core where
 
-import           Control.Concurrent             ( killThread )
-import           Control.Concurrent.Async       ( asyncThreadId
-                                                , cancel
-                                                )
+import           Control.Concurrent.Async       ( cancel )
 import           Control.Concurrent.MVar
 import qualified Control.Logging               as L
 import           Control.Monad.Catch            ( MonadThrow
@@ -20,7 +17,6 @@ import           Data.IORef                     ( readIORef )
 import           Pulsar.Connection              ( AppState(..)
                                                 , PulsarCtx(..)
                                                 )
-import           System.Timeout                 ( timeout )
 
 {- | Pulsar connection monad, which abstracts over a 'Managed' monad. -}
 newtype Connection a = Connection (Managed a)
@@ -55,12 +51,9 @@ runPulsar' (LogOptions lvl out) (Connection mgd) (Pulsar mr) = do
   finalizers ctx = do
     let (worker, connVar) = ctxConnWorker ctx
     app <- readIORef (ctxState ctx)
-    traverse_ (\(a, v) -> putMVar v () >> cancelOrKill a) (appWorkers app)
+    traverse_ (\(a, v) -> putMVar v () >> cancel a) (appWorkers app)
       `finally` putMVar connVar ()
     cancel worker
-  cancelOrKill a = timeout (1 * 1000000) (cancel a) >>= \case
-    Just _  -> return ()
-    Nothing -> killThread $ asyncThreadId a
 
 {- | Internal logging options. Can be used together with `runPulsar'`. -}
 data LogOptions = LogOptions
