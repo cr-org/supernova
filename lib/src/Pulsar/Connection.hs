@@ -6,8 +6,12 @@ import           Control.Concurrent             ( forkIO
                                                 , killThread
                                                 , threadDelay
                                                 )
-import           Control.Concurrent.Async       ( concurrently_ )
+import           Control.Concurrent.Async       ( Async
+                                                , async
+                                                , concurrently_
+                                                )
 import           Control.Concurrent.Chan
+import           Control.Concurrent.MVar
 import           Control.Exception              ( throwIO )
 import           Control.Monad                  ( forever )
 import           Control.Monad.Catch            ( MonadThrow
@@ -15,8 +19,8 @@ import           Control.Monad.Catch            ( MonadThrow
                                                 )
 import           Control.Monad.IO.Class
 import           Control.Monad.Managed          ( MonadManaged
-                                                , Managed
                                                 , managed
+                                                , runManaged
                                                 )
 import qualified Data.Binary                   as B
 import           Data.Foldable                  ( traverse_ )
@@ -49,13 +53,16 @@ newtype SeqId = SeqId B.Word64 deriving (Num, Show)
 newtype ProducerId = PId B.Word64 deriving (Num, Show)
 newtype ConsumerId = CId B.Word64 deriving (Num, Show)
 
+{- | It represents a running worker in the background along with a synchronizer. -}
+type Worker = (Async (), MVar ())
+
 data AppState = AppState
   { appConsumers :: [(ConsumerId, Chan Response)] -- a list of consumer identifiers associated with a communication channel
   , appConsumerId :: ConsumerId                   -- an incremental counter to assign unique consumer ids
   , appProducers :: [(ProducerId, Chan Response)] -- a list of producer identifiers associated with a communication channel
   , appProducerId :: ProducerId                   -- an incremental counter to assign unique producer ids
   , appRequestId :: ReqId                         -- an incremental counter to assign unique request ids for all commands
-  , appWorkers :: [Managed ()]                    -- a list of workers for consumers and producers that run in the background
+  , appWorkers :: [Worker]                        -- a list of workers for consumers and producers that run in the background
   }
 
 mkConsumerId :: MonadIO m => Chan Response -> IORef AppState -> m ConsumerId
@@ -79,7 +86,7 @@ mkRequestId ref = liftIO $ atomicModifyIORef
     let req' = req + 1 in (AppState cs cid ps pid req' w, req)
   )
 
-addWorker :: MonadIO m => IORef AppState -> Managed () -> m ()
+addWorker :: MonadIO m => IORef AppState -> (Async (), MVar ()) -> m ()
 addWorker ref nw = liftIO $ atomicModifyIORef
   ref
   (\(AppState cs cid ps pid req w) -> (AppState cs cid ps pid req (nw : w), ()))
@@ -94,7 +101,7 @@ data ConnectData = ConnData
 data PulsarCtx = Ctx
   { ctxConn :: Connection
   , ctxState :: IORef AppState
-  , ctxHandler :: Managed ()
+  , ctxConnWorker :: Worker
   }
 
 {- | Default connection data: "127.0.0.1:6650" -}
@@ -110,10 +117,14 @@ connect (ConnData h p) = do
   checkConnection socket
   app   <- liftIO initAppState
   kchan <- liftIO newChan
-  let dispatcher  = recvDispatch socket app kchan
-      task        = concurrently_ dispatcher (keepAlive socket kchan)
-      connHandler = void $ managed (bracket (forkIO task) killThread)
-  return $ Ctx (Conn socket) app connHandler
+  var   <- liftIO newEmptyMVar
+  let
+    dispatcher = recvDispatch socket app kchan
+    task       = concurrently_ dispatcher (keepAlive socket kchan)
+    handler =
+      managed (bracket (forkIO task) (\i -> readMVar var >> killThread i))
+  worker <- liftIO $ async (runManaged $ void handler)
+  return $ Ctx (Conn socket) app (worker, var)
 
 checkConnection :: (MonadIO m, MonadThrow m) => NS.Socket -> m ()
 checkConnection socket = do
@@ -130,7 +141,7 @@ recvDispatch s ref chan = forever $ do
   resp                     <- receive s
   (AppState cs _ ps _ _ _) <- readIORef ref
   case getCommand resp ^. F.maybe'pong of
-    Just _  -> writeChan chan (getCommand resp)
+    Just _  -> writeChan chan $ getCommand resp
     Nothing -> traverse_ (`writeChan` resp) ((snd <$> cs) ++ (snd <$> ps))
 
 {- Emit a PING and expect a PONG every 29 seconds. If a PONG is not received, interrupt connection -}
@@ -141,7 +152,7 @@ keepAlive s chan = forever $ do
   sendSimpleCmd s P.ping
   timeout (2 * 1000000) (readChan chan) >>= \case
     Just cmd -> logResponse cmd
-    Nothing  -> throwIO (userError "Keep Alive interruption")
+    Nothing  -> throwIO $ userError "Keep Alive interruption"
 
 sendSimpleCmd :: MonadIO m => NS.Socket -> BaseCommand -> m ()
 sendSimpleCmd s cmd =

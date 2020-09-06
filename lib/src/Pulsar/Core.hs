@@ -88,15 +88,10 @@ ack (Conn s) (CId cid) msgId = do
   sendSimpleCmd s $ P.ack cid msgId
 
 closeConsumer :: Connection -> Chan Response -> ConsumerId -> ReqId -> IO ()
-closeConsumer (Conn s) _ (CId cid) (ReqId req) = do
+closeConsumer (Conn s) chan (CId cid) r@(ReqId req) = do
   logRequest $ P.closeConsumer req cid
   sendSimpleCmd s $ P.closeConsumer req cid
-  -- FIXME: this is a workaround but the problem is the response for close consumer never comes on a SIGTERM when consuming
-  -- from the Chan, since the writer gets interrupted and no messages come in.
-  resp <- receive s
-  case getCommand resp ^. F.maybe'success of
-    Just _  -> logResponse resp
-    Nothing -> return ()
+  void $ verifyResponse r chan F.maybe'success
 
 ------ Keep Alive -------
 

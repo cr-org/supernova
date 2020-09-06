@@ -5,13 +5,17 @@ module Pulsar.Consumer where
 import           Control.Concurrent             ( forkIO
                                                 , killThread
                                                 )
+import           Control.Concurrent.Async       ( async )
 import           Control.Concurrent.Chan
+import           Control.Concurrent.MVar
 import           Control.Monad                  ( forever )
 import           Control.Monad.Catch            ( bracket )
 import           Control.Monad.IO.Class         ( MonadIO
                                                 , liftIO
                                                 )
-import           Control.Monad.Managed          ( managed )
+import           Control.Monad.Managed          ( managed
+                                                , runManaged
+                                                )
 import           Control.Monad.Reader           ( MonadReader
                                                 , ask
                                                 )
@@ -43,10 +47,12 @@ newConsumer topic sub = do
   chan             <- liftIO newChan
   cid              <- mkConsumerId chan app
   fchan            <- liftIO newChan
+  var              <- liftIO newEmptyMVar
   let acquire = mkSubscriber conn chan cid app >> forkIO (fetcher chan fchan)
       release = (newReq app >>= C.closeConsumer conn chan cid >>) . killThread
-      handler = void $ managed (bracket acquire release)
-  addWorker app handler
+      handler = managed (bracket acquire release) >> liftIO (readMVar var)
+  worker <- liftIO $ async (runManaged $ void handler)
+  addWorker app (worker, var)
   return $ Consumer (liftIO $ readChan fchan) (acker conn cid)
  where
   fetcher chan fc = forever $ readChan chan >>= \case

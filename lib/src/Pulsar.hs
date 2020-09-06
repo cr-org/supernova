@@ -46,7 +46,6 @@ module Pulsar
   , Producer(..)
   , Pulsar
   , PulsarConnection
-  , PulsarCtx
   , ConnectData
   , LogLevel(..)
   , LogOptions(..)
