@@ -35,14 +35,14 @@ subscribe req cid topic (SubscriptionName sub) = defMessage
     & F.consumerId .~ cid
     & F.requestId .~ req
 
-flow :: B.Word64 -> BaseCommand
-flow cid = defMessage
+flow :: B.Word64 -> B.Word32 -> BaseCommand
+flow cid permits = defMessage
     & F.type' .~ BaseCommand'FLOW
     & F.flow .~ flowCmd
  where
   flowCmd :: CommandFlow
   flowCmd = defMessage
-    & F.messagePermits .~ 100
+    & F.messagePermits .~ permits
     & F.consumerId .~ cid
 
 ack :: B.Word64 -> MessageIdData -> BaseCommand

@@ -1,4 +1,4 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, LambdaCase #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
 
 {- Defines a Pulsar Monad, which wraps a ReaderT and runs internal computations in the background -}
 module Pulsar.Internal.Core where

@@ -53,6 +53,8 @@ newtype SeqId = SeqId B.Word64 deriving (Num, Show)
 newtype ProducerId = PId B.Word64 deriving (Num, Show)
 newtype ConsumerId = CId B.Word64 deriving (Num, Show)
 
+newtype Permits = Permits B.Word32 deriving (Num, Show)
+
 {- | It represents a running worker in the background along with a synchronizer. -}
 type Worker = (Async (), MVar ())
 
