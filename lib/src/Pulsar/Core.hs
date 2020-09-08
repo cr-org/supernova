@@ -12,7 +12,7 @@ import           Data.Functor                   ( void )
 import           Data.ProtoLens.Field           ( HasField )
 import           Data.Text                      ( Text )
 import           Lens.Family
-import           Proto.PulsarApi
+import           Proto.PulsarApi         hiding ( Subscription )
 import qualified Proto.PulsarApi_Fields        as F
 import           Pulsar.Connection
 import           Pulsar.Internal.Logger
@@ -69,13 +69,14 @@ newSubscriber
   -> ReqId
   -> ConsumerId
   -> Topic
-  -> SubscriptionName
+  -> Subscription
   -> IO ()
-newSubscriber (Conn s) chan r@(ReqId req) (CId cid) topic subs = do
-  logRequest $ P.subscribe req cid topic subs
-  sendSimpleCmd s $ P.subscribe req cid topic subs
-  -- TODO: we may need to check for failure too
-  void $ verifyResponse r chan F.maybe'success
+newSubscriber (Conn s) chan r@(ReqId req) (CId cid) topic (Subscription stype sname)
+  = do
+    logRequest $ P.subscribe req cid topic stype sname
+    sendSimpleCmd s $ P.subscribe req cid topic stype sname
+    -- TODO: we may need to check for failure too
+    void $ verifyResponse r chan F.maybe'success
 
 flow :: Connection -> ConsumerId -> Permits -> IO ()
 flow (Conn s) (CId cid) (Permits p) = do

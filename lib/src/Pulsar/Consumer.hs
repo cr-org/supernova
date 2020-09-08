@@ -84,7 +84,7 @@ updateQueueSize ref f = atomicModifyIORef ref (\x -> (f x, ()))
 newConsumer
   :: (MonadIO m, MonadIO f, MonadReader PulsarCtx m)
   => Topic
-  -> SubscriptionName
+  -> Subscription
   -> m (Consumer f)
 newConsumer topic sub = do
   (Ctx conn app _) <- ask

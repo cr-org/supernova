@@ -12,7 +12,6 @@ Consider the following imports (needs the [async](http://hackage.haskell.org/pac
 @
 import           Control.Concurrent             ( threadDelay )
 import           Control.Concurrent.Async       ( concurrently_ )
-import           Control.Monad                  ( forever )
 import           Pulsar
 @
 
@@ -28,9 +27,12 @@ Then a consumer and a producer, which operate in the 'Pulsar' monad.
 @
 pulsar :: Pulsar ()
 pulsar = do
-  c <- newConsumer topic "test-sub"
+  c <- newConsumer topic sub
   p <- newProducer topic
   liftIO $ program c p
+ where
+  topic = defaultTopic "app"
+  sub   = Subscription Exclusive "test-sub"
 @
 
 And the main user program that consume and produce messages concurrently, running in 'IO'.
@@ -38,12 +40,12 @@ And the main user program that consume and produce messages concurrently, runnin
 @
 program :: Consumer IO -> Producer IO -> IO ()
 program Consumer {..} Producer {..} =
-  let c = forever $ fetch >>= \(Message i m) -> print m >> ack i
-      p = forever $ threadDelay (5 * 1000000) >> send "Hello World!"
+  let c = fetch >>= \(Message i m) -> print m >> ack i >> c
+      p = threadDelay (3 * 1000000) >> send "Hello World!" >> p
   in  concurrently_ c p
 @
 
-We have a delay of 5 seconds before publishing to make sure the consumer is already running. Otherwise, it might miss some messages.
+We have a delay of 3 seconds before publishing to make sure the consumer is already running. Otherwise, it might miss some messages.
 
 Finally, we put it all together and call 'runPulsar' with the connection and the program in the 'Pulsar' monad.
 
