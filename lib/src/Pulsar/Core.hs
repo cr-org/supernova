@@ -77,10 +77,10 @@ newSubscriber (Conn s) chan r@(ReqId req) (CId cid) topic subs = do
   -- TODO: we may need to check for failure too
   void $ verifyResponse r chan F.maybe'success
 
-flow :: Connection -> ConsumerId -> IO ()
-flow (Conn s) (CId cid) = do
-  logRequest $ P.flow cid
-  sendSimpleCmd s $ P.flow cid
+flow :: Connection -> ConsumerId -> Permits -> IO ()
+flow (Conn s) (CId cid) (Permits p) = do
+  logRequest $ P.flow cid p
+  sendSimpleCmd s $ P.flow cid p
 
 ack :: MonadIO m => Connection -> ConsumerId -> MessageIdData -> m ()
 ack (Conn s) (CId cid) msgId = do

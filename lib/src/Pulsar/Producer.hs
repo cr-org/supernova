@@ -1,6 +1,28 @@
 {-# LANGUAGE FlexibleContexts #-}
 
-{- Defines a high-level Pulsar producer for the end user -}
+{- |
+Module      : Pulsar.Producer
+Description : Apache Pulsar client
+License     : Apache-2.0
+Maintainer  : gabriel.volpe@chatroulette.com
+Stability   : experimental
+
+The basic producer interaction looks as follows: http://pulsar.apache.org/docs/en/develop-binary-protocol/#producer
+
+>>> LOOKUP
+<<< LOOKUP_RESPONSE
+>>> PRODUCER
+<<< SUCCESS
+>>> SEND 1
+>>> SEND 2
+<<< SEND_RECEIPT 1
+<<< SEND_RECEIPT 2
+
+When the program finishes, either succesfully or due to a failure, we close the producer.
+
+>>> CLOSE_PRODUCER
+<<< SUCCESS
+-}
 module Pulsar.Producer where
 
 import           Control.Concurrent.Async       ( async )
