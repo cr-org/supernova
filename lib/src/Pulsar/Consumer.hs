@@ -103,17 +103,6 @@ newConsumer topic sub = do
   addWorker app (worker, var)
   return $ Consumer (liftIO $ readChan fchan) (acker conn cid)
  where
-  fetcher chan fc ref f = forever $ readChan chan >>= \case
-    PayloadResponse cmd _ p -> for_ (cmd ^. F.maybe'message) $ \msg -> do
-      let msgId = msg ^. F.messageId
-          pm    = Message (MsgId msgId) $ maybe "" (\(Payload x) -> x) p
-          reset = updateQueueSize ref ((defaultQueueSize `div` 2) -)
-      logResponse cmd
-      updateQueueSize ref (+ 1)
-      size <- readIORef ref
-      when (size >= defaultQueueSize `div` 2) (f >> reset)
-      writeChan fc pm
-    _ -> return ()
   newReq app = mkRequestId app
   acker conn cid (MsgId mid) = liftIO $ C.ack conn cid mid
   issuePermits conn cid =
@@ -124,3 +113,23 @@ newConsumer topic sub = do
     req2 <- newReq app
     C.newSubscriber conn chan req2 cid topic sub
     C.flow conn cid (Permits $ fromIntegral defaultQueueSize)
+
+{- | It reads responses from the main communication channel and whenever it corresponds to a
+ - 'PayloadResponse', it creates a 'Message' and it writes it to the fetcher channel, which
+ - is the one the 'fetch' function is listening on.
+ -
+ - It also keeps count of the internal fetcher channel size and issues new permits (FLOW)
+ - whenever necessary.
+ -}
+fetcher :: Chan Response -> Chan Message -> IORef Int -> IO a -> IO b
+fetcher chan fc ref f = forever $ readChan chan >>= \case
+  PayloadResponse cmd _ p -> for_ (cmd ^. F.maybe'message) $ \msg -> do
+    let msgId = msg ^. F.messageId
+        pm    = Message (MsgId msgId) $ maybe "" (\(Payload x) -> x) p
+        reset = updateQueueSize ref ((defaultQueueSize `div` 2) -)
+    logResponse cmd
+    updateQueueSize ref (+ 1)
+    size <- readIORef ref
+    when (size >= defaultQueueSize `div` 2) (f >> reset)
+    writeChan fc pm
+  _ -> return ()

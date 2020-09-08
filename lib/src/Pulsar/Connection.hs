@@ -138,6 +138,8 @@ checkConnection socket = do
 initAppState :: MonadIO m => m (IORef AppState)
 initAppState = liftIO . newIORef $ AppState [] 0 [] 0 0 []
 
+{- | It listens to incoming messages directly from the network socket and it writes them to all the
+ - consumers and producers' communication channels. -}
 recvDispatch :: NS.Socket -> IORef AppState -> Chan BaseCommand -> IO ()
 recvDispatch s ref chan = forever $ do
   resp                     <- receive s

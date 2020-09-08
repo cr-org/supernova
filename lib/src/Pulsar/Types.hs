@@ -1,3 +1,5 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 {-|
 Module      : Pulsar.Types
 Description : End-user Pulsar API types.
@@ -11,7 +13,9 @@ module Pulsar.Types where
 
 import qualified Data.ByteString.Lazy.Char8    as CL
 import           Data.Char                      ( toLower )
-import           Data.String
+import           Data.String                    ( IsString
+                                                , fromString
+                                                )
 import qualified Data.Text                     as T
 import           Proto.PulsarApi                ( MessageIdData )
 
@@ -24,11 +28,11 @@ data Topic = Topic
   }
 
 {- | A default 'Topic': "non-persistent:\/\/public\/default\/my-topic". -}
-defaultTopic :: String -> Topic
+defaultTopic :: TopicName -> Topic
 defaultTopic n = Topic { type'     = NonPersistent
-                       , tenant    = Tenant "public"
-                       , namespace = NameSpace "default"
-                       , name      = TopicName n
+                       , tenant    = "public"
+                       , namespace = "default"
+                       , name      = n
                        }
 
 instance Show Topic where
@@ -43,22 +47,31 @@ instance Show TopicType where
   show NonPersistent = "non-persistent"
 
 {- | A tenant can be any string value. Default value is "public". -}
-newtype Tenant = Tenant String
+newtype Tenant = Tenant T.Text
+
+instance IsString Tenant where
+  fromString = Tenant . T.pack
 
 instance Show Tenant where
-  show (Tenant t) = t
+  show (Tenant t) = T.unpack t
 
 {- | A namespace can be any string value. Default value is "default". -}
-newtype NameSpace = NameSpace String
+newtype NameSpace = NameSpace T.Text
+
+instance IsString NameSpace where
+  fromString = NameSpace . T.pack
 
 instance Show NameSpace where
-  show (NameSpace t) = t
+  show (NameSpace t) = T.unpack t
 
 {- | A topic name can be any string value. -}
-newtype TopicName = TopicName String
+newtype TopicName = TopicName T.Text
+
+instance IsString TopicName where
+  fromString = TopicName . T.pack
 
 instance Show TopicName where
-  show (TopicName t) = t
+  show (TopicName t) = T.unpack t
 
 {- | A message id, needed for acknowledging messages. See 'Pulsar.Consumer.ack'. -}
 newtype MsgId = MsgId MessageIdData

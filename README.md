@@ -16,17 +16,23 @@ The example located in `test/Main.hs` showcases a consumer & producer running co
 ```haskell
 main :: IO ()
 main = runPulsar conn $ do
-  c <- newConsumer topic "test-sub"
+  c <- newConsumer topic sub
   p <- newProducer topic
   liftIO $ program c p
 
 conn :: PulsarConnection
 conn = connect defaultConnectData
 
+topic :: Topic
+topic = defaultTopic "app"
+
+sub :: Subscription
+sub = Subscription Exclusive "test-sub"
+
 program :: Consumer IO -> Producer IO -> IO ()
 program Consumer {..} Producer {..} =
-  let c = forever $ fetch >>= \(Message i m) -> msgDecoder m >> ack i
-      p = forever $ sleep 5 >> traverse_ send messages
+  let c = fetch >>= \(Message i m) -> msgDecoder m >> ack i >> c
+      p = sleep 3 >> traverse_ send messages >> p
   in  concurrently_ c p
 ```
 
@@ -56,8 +62,8 @@ import qualified Streamly.Prelude              as S
 
 program :: Consumer IO -> Producer IO -> IO ()
 program Consumer {..} Producer {..} =
-  let c = forever $ fetch >>= \(Message i m) -> msgDecoder m >> ack i
-      p = forever $ sleep 5 >> traverse_ send messages
+  let c = fetch >>= \(Message i m) -> msgDecoder m >> ack i >> c
+      p = sleep 3 >> traverse_ send messages >> p
   in  S.drain . asyncly . maxThreads 10 $ S.yieldM c <> S.yieldM p
 ```
 
