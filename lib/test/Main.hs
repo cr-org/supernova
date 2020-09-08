@@ -38,6 +38,9 @@ msgDecoder bs =
 topic :: Topic
 topic = defaultTopic "app"
 
+sub :: Subscription
+sub = Subscription Exclusive "test-sub"
+
 demo :: IO ()
 demo = runPulsar conn pulsar
 
@@ -46,7 +49,7 @@ conn = connect defaultConnectData
 
 pulsar :: Pulsar ()
 pulsar = do
-  c <- newConsumer topic "test-sub"
+  c <- newConsumer topic sub
   p <- newProducer topic
   liftIO $ program c p
 
@@ -64,7 +67,7 @@ logOpts = LogOptions Info StdOut
 
 streamDemo :: IO ()
 streamDemo = runPulsar' logOpts conn $ do
-  c <- newConsumer topic "test-sub"
+  c <- newConsumer topic sub
   p <- newProducer topic
   liftIO $ streamProgram c p
 

@@ -73,7 +73,13 @@ instance IsString PulsarMessage where
   fromString = PulsarMessage . CL.pack
 
 {- | A subscription name can be any string value. -}
-newtype SubscriptionName = SubscriptionName T.Text deriving Show
+newtype SubName = SubName T.Text deriving Show
 
-instance IsString SubscriptionName where
-  fromString = SubscriptionName . T.pack
+instance IsString SubName where
+  fromString = SubName . T.pack
+
+{- | A subscription type. See <https://pulsar.apache.org/docs/en/concepts-messaging/#subscriptions> to learn more. -}
+data SubType = Exclusive | Failover | Shared | KeyShared deriving Show
+
+{- | A subscription with a type and a name. -}
+data Subscription = Subscription SubType SubName deriving Show

@@ -22,16 +22,22 @@ connect = defMessage
     & F.clientVersion .~ "Pulsar-Client-Haskell-v" <> T.pack (showVersion version)
     & F.protocolVersion .~ 15
 
-subscribe :: B.Word64 -> B.Word64 -> Topic -> SubscriptionName -> BaseCommand
-subscribe req cid topic (SubscriptionName sub) = defMessage
+subType :: SubType -> CommandSubscribe'SubType
+subType Exclusive = CommandSubscribe'Exclusive
+subType Shared    = CommandSubscribe'Shared
+subType Failover  = CommandSubscribe'Failover
+subType KeyShared = CommandSubscribe'Key_Shared
+
+subscribe :: B.Word64 -> B.Word64 -> Topic -> SubType -> SubName -> BaseCommand
+subscribe req cid topic stype (SubName sname) = defMessage
     & F.type' .~ BaseCommand'SUBSCRIBE
     & F.subscribe .~ subs
  where
   subs :: CommandSubscribe
   subs = defMessage
     & F.topic .~ T.pack (show topic)
-    & F.subscription .~ sub
-    & F.subType .~ CommandSubscribe'Shared
+    & F.subscription .~ sname
+    & F.subType .~ subType stype
     & F.consumerId .~ cid
     & F.requestId .~ req
 
