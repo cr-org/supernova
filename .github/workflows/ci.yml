@@ -4,6 +4,7 @@ on:
   pull_request:
     paths-ignore:
       - "proto/**"
+      - "README.md"
   push:
     branches:
       - master

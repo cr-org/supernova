@@ -4,6 +4,7 @@ on:
   pull_request:
     paths-ignore:
       - "lib/**"
+      - "README.md"
   push:
     branches:
       - master
