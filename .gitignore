@@ -6,3 +6,4 @@ dist/
 .ghc.*
 .direnv
 result
+lib/DEBUG.md

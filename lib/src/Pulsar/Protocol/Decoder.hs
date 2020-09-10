@@ -7,7 +7,7 @@ module Pulsar.Protocol.Decoder
   )
 where
 
-import           Control.Monad                  ( unless )
+import           Control.Monad                  ( guard )
 import qualified Data.Binary                   as B
 import qualified Data.Binary.Get               as B
 import qualified Data.Binary.Put               as B
@@ -17,6 +17,8 @@ import           Data.Int                       ( Int32 )
 import qualified Data.ProtoLens.Encoding       as PL
 import           Pulsar.Protocol.CheckSum
 import           Pulsar.Protocol.Frame
+
+data ValidateCheckSum = Yes | No deriving Show
 
 {-
  - These 5 bytes are part of a total of 8 bytes sent as the payload's prefix from the Java client.
@@ -30,48 +32,60 @@ dropPayloadGarbage :: CL.ByteString -> CL.ByteString
 dropPayloadGarbage bs =
   maybe bs (CL.drop 3) (CL.stripPrefix "\NUL\NUL\NUL\EOT\CAN" bs)
 
+{- | Parse total size, command size and message. If done, return simple frame. Otherwise, try to parse a payload frame. -}
 parseFrame :: B.Get Frame
 parseFrame = do
   ts <- B.getInt32be
   cs <- B.getInt32be
   ms <- B.getLazyByteString (fromIntegral cs)
-  let simpleCmd = SimpleCommand ts cs ms
+  let simpleCmd  = SimpleCommand ts cs ms
+      payloadRes = parsePayload ts cs simpleCmd
   B.isEmpty >>= \case
-    True  -> return $ SimpleFrame simpleCmd
-    False -> parsePayload ts cs simpleCmd
+    True  -> return $! SimpleFrame simpleCmd
+    False -> validateMagicNumber payloadRes
 
+{- | The 2-bytes "magic number" is optional. If present, it indicates that a 4-bytes checksum follows. -}
+validateMagicNumber :: (ValidateCheckSum -> B.Get Frame) -> B.Get Frame
+validateMagicNumber payload = B.lookAheadM peekMagicNumber >>= \case
+  Just _  -> payload Yes
+  Nothing -> payload No
+ where
+  peekMagicNumber :: B.Get (Maybe ())
+  peekMagicNumber = guard . (== frameMagicNumber) <$> B.getWord16be
+
+{- | If a checksum is given, validate it. Otherwise, return simple frame. -}
 validateCheckSum :: Frame -> B.Get Frame
-validateCheckSum (PayloadFrame sc (PayloadCommand cs ms md pl)) =
-  case runCheckSum (B.runPut (B.putInt32be ms) <> md <> pl) (CheckSum cs) of
+validateCheckSum (PayloadFrame sc (PayloadCommand cs@(Just csm) ms md pl)) =
+  case runCheckSum (B.runPut (B.putInt32be ms) <> md <> pl) csm of
     Valid -> return
       $! PayloadFrame sc (PayloadCommand cs ms md (dropPayloadGarbage pl))
     Invalid -> fail "Invalid checksum"
 validateCheckSum x = return $! x
 
-parsePayload :: Int32 -> Int32 -> SimpleCmd -> B.Get Frame
-parsePayload ts cs simpleCmd = do
-  mn <- B.getWord16be
-  unless (mn == frameMagicNumber) $ fail ("Invalid magic number: " <> show mn)
-  cm <- B.getWord32be
-  ms <- B.getInt32be
-  md <- B.getLazyByteString . fromIntegral $ ms
-  -- 14 remaining bytes = 4 (command size field) + 2 (magic number) + 4 (checksum) + 4 (metadata size field)
-  pl <- payload $ ts - (14 + cs + ms)
-  let payloadCmd = PayloadCommand cm ms md pl
-  validateCheckSum (PayloadFrame simpleCmd payloadCmd)
+{- | Take in a simple command and try to parse a payload command. -}
+parsePayload :: Int32 -> Int32 -> SimpleCmd -> ValidateCheckSum -> B.Get Frame
+parsePayload ts cs simpleCmd vcs = case vcs of
+  Yes -> parsePayload' . Just . CheckSum =<< B.getWord32be
+  No  -> parsePayload' Nothing
  where
-  payload rms | rms > 0   = B.getLazyByteString $ fromIntegral rms
-              | otherwise = pure CL.empty
+  parsePayload' cm = do
+    ms <- B.getInt32be
+    md <- B.getLazyByteString . fromIntegral $ ms
+    pl <- B.getLazyByteString . fromIntegral $ ts - (remaining cm + cs + ms)
+    let frame = PayloadFrame simpleCmd (PayloadCommand cm ms md pl)
+    validateCheckSum frame
+  remaining (Just _) = 14 -- 4 (command size) + 2 (magic number) + 4 (checksum) + 4 (metadata size)
+  remaining Nothing  = 8  -- no magic number and checksum
 
 decodeFrame :: CL.ByteString -> Either String Frame
 decodeFrame =
   bimap (\(_, _, e) -> e) (\(_, _, f) -> f) . B.runGetOrFail parseFrame
 
+{- | Decode either a 'SimpleFrame' or a 'PayloadFrame'. -}
 decodeBaseCommand :: CL.ByteString -> Either String Response
 decodeBaseCommand bytes = decodeFrame bytes >>= \case
-  SimpleFrame s -> do
-    cmd <- PL.decodeMessage (CL.toStrict $ frameMessage s)
-    return $ SimpleResponse cmd
+  SimpleFrame s ->
+    SimpleResponse <$> PL.decodeMessage (CL.toStrict $ frameMessage s)
   PayloadFrame s (PayloadCommand _ _ md pl) -> do
     cmd  <- PL.decodeMessage . CL.toStrict $ frameMessage s
     meta <- PL.decodeMessage . CL.toStrict $ md
