@@ -59,7 +59,8 @@ import           Data.Functor                   ( void )
 import           Lens.Family             hiding ( reset )
 import qualified Proto.PulsarApi_Fields        as F
 import qualified Pulsar.Core                   as C
-import           Pulsar.Connection
+import           Pulsar.AppState
+import           Pulsar.Connection              ( PulsarCtx(..) )
 import           Pulsar.Internal.Logger         ( logResponse )
 import           Pulsar.Protocol.Frame          ( Payload(..)
                                                 , Response(..)
@@ -95,9 +96,10 @@ newConsumer topic sub = do
   var              <- liftIO newEmptyMVar
   let permits = issuePermits conn cid
       acquire = do
-        mkSubscriber conn chan cid app
+        mkSubscriber conn cid app
         forkIO (fetcher chan fchan ref permits)
-      release i = killThread i >> newReq app >>= C.closeConsumer conn chan cid
+      release i =
+        killThread i >> newReq app >>= \(r, v) -> C.closeConsumer conn v cid r
       handler = managed (bracket acquire release) >> liftIO (readMVar var)
   worker <- liftIO $ async (runManaged $ void handler)
   addWorker app (worker, var)
@@ -107,11 +109,11 @@ newConsumer topic sub = do
   acker conn cid (MsgId mid) = liftIO $ C.ack conn cid mid
   issuePermits conn cid =
     C.flow conn cid (Permits $ fromIntegral (defaultQueueSize `div` 2))
-  mkSubscriber conn chan cid app = do
-    req1 <- newReq app
-    C.lookup conn chan req1 topic
-    req2 <- newReq app
-    C.newSubscriber conn chan req2 cid topic sub
+  mkSubscriber conn cid app = do
+    (req1, var1) <- newReq app
+    C.lookup conn var1 req1 topic
+    (req2, var2) <- newReq app
+    C.newSubscriber conn var2 req2 cid topic sub
     C.flow conn cid (Permits $ fromIntegral defaultQueueSize)
 
 {- | It reads responses from the main communication channel and whenever it corresponds to a

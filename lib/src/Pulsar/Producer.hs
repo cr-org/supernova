@@ -26,7 +26,6 @@ When the program finishes, either succesfully or due to a failure, we close the 
 module Pulsar.Producer where
 
 import           Control.Concurrent.Async       ( async )
-import           Control.Concurrent.Chan
 import           Control.Monad.Catch            ( bracket_ )
 import           Control.Concurrent.MVar
 import           Control.Monad.IO.Class         ( MonadIO
@@ -40,8 +39,9 @@ import           Control.Monad.Reader           ( MonadReader
                                                 )
 import           Data.IORef
 import           Data.Text                      ( Text )
+import           Pulsar.AppState
 import qualified Pulsar.Core                   as C
-import           Pulsar.Connection
+import           Pulsar.Connection              ( PulsarCtx(..) )
 import           Pulsar.Types
 
 {- | An abstract 'Producer' able to 'send' messages of type 'PulsarMessage'. -}
@@ -64,23 +64,23 @@ newProducer
   :: (MonadIO m, MonadReader PulsarCtx m, MonadIO f) => Topic -> m (Producer f)
 newProducer topic = do
   (Ctx conn app _) <- ask
-  chan             <- liftIO newChan
-  pid              <- mkProducerId chan app
-  pname            <- liftIO $ mkProducer conn chan pid app
+  pid              <- mkProducerId app
+  pname            <- liftIO $ mkProducer conn pid app
   pst              <- liftIO $ newIORef (ProducerState 0 pname)
   var              <- liftIO newEmptyMVar
-  let release = newReq app >>= C.closeProducer conn chan pid
+  let release = newReq app >>= \(r, v) -> C.closeProducer conn v pid r
       handler = managed_ (bracket_ (pure ()) release) >> liftIO (readMVar var)
   worker <- liftIO $ async (runManaged handler)
   addWorker app (worker, var)
-  return $ Producer (dispatch conn chan pid pst)
+  return $ Producer (dispatch conn pid app pst)
  where
   newReq app = mkRequestId app
-  dispatch conn chan pid pst msg = do
+  dispatch conn pid app pst msg = do
     sid <- mkSeqId pst
-    liftIO $ C.send conn chan pid sid msg
-  mkProducer conn chan pid app = do
-    req1 <- newReq app
-    C.lookup conn chan req1 topic
-    req2 <- newReq app
-    C.newProducer conn chan req2 pid topic
+    var <- registerSeqId app pid sid
+    liftIO $ C.send conn var pid sid msg
+  mkProducer conn pid app = do
+    (req1, var1) <- newReq app
+    C.lookup conn var1 req1 topic
+    (req2, var2) <- newReq app
+    C.newProducer conn var2 req2 pid topic
