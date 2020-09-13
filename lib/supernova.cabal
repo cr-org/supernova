@@ -19,6 +19,7 @@ library
   other-modules:       Paths_supernova
                      , Proto.PulsarApi
                      , Proto.PulsarApi_Fields
+                     , Pulsar.AppState
                      , Pulsar.Core
                      , Pulsar.Connection
                      , Pulsar.Consumer

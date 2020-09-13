@@ -1,19 +1,21 @@
-{-# LANGUAGE GeneralizedNewtypeDeriving, LambdaCase, OverloadedStrings #-}
+{-# LANGUAGE LambdaCase, OverloadedStrings #-}
 
 module Pulsar.Connection where
 
+import           Control.Applicative            ( (<|>) )
 import           Control.Concurrent             ( forkIO
                                                 , killThread
                                                 , threadDelay
                                                 )
-import           Control.Concurrent.Async       ( Async
-                                                , async
+import           Control.Concurrent.Async       ( async
                                                 , concurrently_
                                                 )
 import           Control.Concurrent.Chan
 import           Control.Concurrent.MVar
 import           Control.Exception              ( throwIO )
-import           Control.Monad                  ( forever )
+import           Control.Monad                  ( forever
+                                                , when
+                                                )
 import           Control.Monad.Catch            ( MonadThrow
                                                 , bracket
                                                 )
@@ -22,7 +24,6 @@ import           Control.Monad.Managed          ( MonadManaged
                                                 , managed
                                                 , runManaged
                                                 )
-import qualified Data.Binary                   as B
 import           Data.Foldable                  ( traverse_ )
 import           Data.Functor                   ( void )
 import           Data.IORef
@@ -34,6 +35,7 @@ import           Proto.PulsarApi                ( BaseCommand
                                                 , MessageMetadata
                                                 )
 import qualified Proto.PulsarApi_Fields        as F
+import           Pulsar.AppState
 import           Pulsar.Internal.Logger
 import           Pulsar.Internal.TCPClient      ( acquireSocket )
 import qualified Pulsar.Protocol.Commands      as P
@@ -47,51 +49,6 @@ import           Pulsar.Protocol.Frame          ( Payload
 import           System.Timeout                 ( timeout )
 
 newtype Connection = Conn NS.Socket
-
-newtype ReqId = ReqId B.Word64 deriving (Num, Show)
-newtype SeqId = SeqId B.Word64 deriving (Num, Show)
-newtype ProducerId = PId B.Word64 deriving (Num, Show)
-newtype ConsumerId = CId B.Word64 deriving (Num, Show)
-
-newtype Permits = Permits B.Word32 deriving (Num, Show)
-
-{- | It represents a running worker in the background along with a synchronizer. -}
-type Worker = (Async (), MVar ())
-
-data AppState = AppState
-  { appConsumers :: [(ConsumerId, Chan Response)] -- a list of consumer identifiers associated with a communication channel
-  , appConsumerId :: ConsumerId                   -- an incremental counter to assign unique consumer ids
-  , appProducers :: [(ProducerId, Chan Response)] -- a list of producer identifiers associated with a communication channel
-  , appProducerId :: ProducerId                   -- an incremental counter to assign unique producer ids
-  , appRequestId :: ReqId                         -- an incremental counter to assign unique request ids for all commands
-  , appWorkers :: [Worker]                        -- a list of workers for consumers and producers that run in the background
-  }
-
-mkConsumerId :: MonadIO m => Chan Response -> IORef AppState -> m ConsumerId
-mkConsumerId chan ref = liftIO $ atomicModifyIORef
-  ref
-  (\(AppState cs cid ps pid rid w) ->
-    let cid' = cid + 1 in (AppState ((cid', chan) : cs) cid' ps pid rid w, cid)
-  )
-
-mkProducerId :: MonadIO m => Chan Response -> IORef AppState -> m ProducerId
-mkProducerId chan ref = liftIO $ atomicModifyIORef
-  ref
-  (\(AppState cs cid ps pid rid w) ->
-    let pid' = pid + 1 in (AppState cs cid ((pid', chan) : ps) pid' rid w, pid)
-  )
-
-mkRequestId :: MonadIO m => IORef AppState -> m ReqId
-mkRequestId ref = liftIO $ atomicModifyIORef
-  ref
-  (\(AppState cs cid ps pid req w) ->
-    let req' = req + 1 in (AppState cs cid ps pid req' w, req)
-  )
-
-addWorker :: MonadIO m => IORef AppState -> (Async (), MVar ()) -> m ()
-addWorker ref nw = liftIO $ atomicModifyIORef
-  ref
-  (\(AppState cs cid ps pid req w) -> (AppState cs cid ps pid req (nw : w), ()))
 
 {- | Connection details: host and port. -}
 data ConnectData = ConnData
@@ -136,17 +93,48 @@ checkConnection socket = do
     Nothing -> liftIO . throwIO $ userError "Could not connect"
 
 initAppState :: MonadIO m => m (IORef AppState)
-initAppState = liftIO . newIORef $ AppState [] 0 [] 0 0 []
+initAppState = liftIO . newIORef $ AppState [] 0 0 0 [] [] []
+
+responseForRequest :: BaseCommand -> Maybe ReqId
+responseForRequest cmd =
+  let cmd1 = view F.requestId <$> cmd ^. F.maybe'success
+      cmd2 = view F.requestId <$> cmd ^. F.maybe'producerSuccess
+      cmd3 = view F.requestId <$> cmd ^. F.maybe'lookupTopicResponse
+  in  ReqId <$> (cmd1 <|> cmd2 <|> cmd3)
+
+responseForSendReceipt :: BaseCommand -> Maybe (ProducerId, SeqId)
+responseForSendReceipt cmd =
+  let cmd' = cmd ^. F.maybe'sendReceipt
+      pid  = PId . view F.producerId <$> cmd'
+      sid  = SeqId . view F.sequenceId <$> cmd'
+  in  (,) <$> pid <*> sid
+
+pongResponse :: BaseCommand -> Chan BaseCommand -> IO (Maybe ())
+pongResponse cmd chan =
+  traverse (const $ writeChan chan cmd) (cmd ^. F.maybe'pong)
+
+messageResponse :: BaseCommand -> Maybe ConsumerId
+messageResponse cmd =
+  let cmd' = cmd ^. F.maybe'message
+      cid  = view F.consumerId <$> cmd'
+  in  CId <$> cid
 
 {- | It listens to incoming messages directly from the network socket and it writes them to all the
  - consumers and producers' communication channels. -}
 recvDispatch :: NS.Socket -> IORef AppState -> Chan BaseCommand -> IO ()
 recvDispatch s ref chan = forever $ do
-  resp                     <- receive s
-  (AppState cs _ ps _ _ _) <- readIORef ref
-  case getCommand resp ^. F.maybe'pong of
-    Just _  -> writeChan chan $ getCommand resp
-    Nothing -> traverse_ (`writeChan` resp) ((snd <$> cs) ++ (snd <$> ps))
+  resp <- receive s
+  cs   <- appConsumers <$> readIORef ref
+  let
+    f = \rid -> registerReqResponse ref rid resp
+    g = (\(pid, sid) -> registerSendReceipt ref pid sid resp)
+    h = \cid ->
+      traverse (\(cid', cn) -> when (cid == cid') (writeChan cn resp)) cs
+    cmd = getCommand resp
+  traverse_ f (responseForRequest cmd)
+  traverse_ g (responseForSendReceipt cmd)
+  traverse_ h (messageResponse cmd)
+  pongResponse cmd chan
 
 {- Emit a PING and expect a PONG every 29 seconds. If a PONG is not received, interrupt connection -}
 keepAlive :: NS.Socket -> Chan BaseCommand -> IO ()

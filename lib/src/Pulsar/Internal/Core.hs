@@ -14,9 +14,8 @@ import           Control.Monad.Managed
 import           Control.Monad.Reader
 import           Data.Foldable                  ( traverse_ )
 import           Data.IORef                     ( readIORef )
-import           Pulsar.Connection              ( AppState(..)
-                                                , PulsarCtx(..)
-                                                )
+import           Pulsar.AppState                ( AppState(..) )
+import           Pulsar.Connection              ( PulsarCtx(..) )
 
 {- | Pulsar connection monad, which abstracts over a 'Managed' monad. -}
 newtype Connection a = Connection (Managed a)
