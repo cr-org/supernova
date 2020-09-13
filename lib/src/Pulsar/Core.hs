@@ -29,8 +29,7 @@ lookup (Conn s) var (ReqId req) topic = do
   logRequest $ P.lookup req topic
   sendSimpleCmd s $ P.lookup req topic
   -- TODO: we need to analyze it and might need to re-issue another lookup
-  resp <- readMVar var
-  logResponse resp
+  readMVar var >>= logResponse
 
 newProducer
   :: Connection -> MVar Response -> ReqId -> ProducerId -> Topic -> IO Text
@@ -47,8 +46,7 @@ closeProducer :: Connection -> MVar Response -> ProducerId -> ReqId -> IO ()
 closeProducer (Conn s) var (PId pid) (ReqId req) = do
   logRequest $ P.closeProducer req pid
   sendSimpleCmd s $ P.closeProducer req pid
-  resp <- readMVar var
-  logResponse resp
+  readMVar var >>= logResponse
 
 newSubscriber
   :: Connection
@@ -62,8 +60,7 @@ newSubscriber (Conn s) var (ReqId req) (CId cid) topic (Subscription stype sname
   = do
     logRequest $ P.subscribe req cid topic stype sname
     sendSimpleCmd s $ P.subscribe req cid topic stype sname
-    resp <- readMVar var
-    logResponse resp
+    readMVar var >>= logResponse
 
 flow :: Connection -> ConsumerId -> Permits -> IO ()
 flow (Conn s) (CId cid) (Permits p) = do
@@ -79,8 +76,7 @@ closeConsumer :: Connection -> MVar Response -> ConsumerId -> ReqId -> IO ()
 closeConsumer (Conn s) var (CId cid) (ReqId req) = do
   logRequest $ P.closeConsumer req cid
   sendSimpleCmd s $ P.closeConsumer req cid
-  resp <- readMVar var
-  logResponse resp
+  readMVar var >>= logResponse
 
 ------ Keep Alive -------
 
@@ -110,5 +106,4 @@ send
 send (Conn s) var (PId pid) (SeqId sid) (PulsarMessage msg) = do
   logRequest $ P.send pid sid
   sendPayloadCmd s (P.send pid sid) P.messageMetadata (Just $ Payload msg)
-  resp <- readMVar var
-  logResponse resp
+  readMVar var >>= logResponse
