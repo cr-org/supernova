@@ -50,7 +50,7 @@ runPulsar' (LogOptions lvl out) (Connection mgd) (Pulsar mr) = do
   finalizers ctx = do
     let (worker, connVar) = ctxConnWorker ctx
     app <- readIORef (ctxState ctx)
-    traverse_ (\(a, v) -> putMVar v () >> cancel a) (appWorkers app)
+    traverse_ (\(a, v) -> putMVar v () >> cancel a) (_appWorkers app)
       `finally` putMVar connVar ()
     cancel worker
 
