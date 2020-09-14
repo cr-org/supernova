@@ -124,7 +124,7 @@ messageResponse cmd =
 recvDispatch :: NS.Socket -> IORef AppState -> Chan BaseCommand -> IO ()
 recvDispatch s ref chan = forever $ do
   resp <- receive s
-  cs   <- appConsumers <$> readIORef ref
+  cs   <- _appConsumers <$> readIORef ref
   let
     f = \rid -> registerReqResponse ref rid resp
     g = (\(pid, sid) -> registerSendReceipt ref pid sid resp)
