@@ -3,7 +3,7 @@
 {- Defines a set of transactional commands, communicating via internal channels -}
 module Pulsar.Core where
 
-import           Control.Concurrent.Chan
+import           Control.Concurrent.Chan.Unagi
 import           Control.Concurrent.MVar
 import           Control.Exception              ( throwIO )
 import           Control.Monad.Catch            ( MonadThrow )
@@ -80,11 +80,11 @@ closeConsumer (Conn s) var (CId cid) (ReqId req) = do
 
 ------ Keep Alive -------
 
-ping :: (MonadThrow m, MonadIO m) => Connection -> Chan Response -> m ()
-ping (Conn s) chan = do
+ping :: (MonadThrow m, MonadIO m) => Connection -> OutChan Response -> m ()
+ping (Conn s) outChan = do
   logRequest P.ping
   sendSimpleCmd s P.ping
-  cmd <- getCommand <$> liftIO (readChan chan)
+  cmd <- getCommand <$> liftIO (readChan outChan)
   case cmd ^. F.maybe'pong of
     Just p  -> logResponse p
     Nothing -> liftIO . throwIO $ userError "Failed to get PONG"

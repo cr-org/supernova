@@ -38,7 +38,7 @@ import           Control.Concurrent             ( forkIO
                                                 , killThread
                                                 )
 import           Control.Concurrent.Async       ( async )
-import           Control.Concurrent.Chan
+import           Control.Concurrent.Chan.Unagi
 import           Control.Concurrent.MVar
 import           Control.Monad                  ( forever
                                                 , when
@@ -89,21 +89,21 @@ newConsumer
   -> m (Consumer f)
 newConsumer topic sub = do
   (Ctx conn app _) <- ask
-  chan             <- liftIO newChan
-  cid              <- mkConsumerId chan app
-  fchan            <- liftIO newChan
+  (cin, cout)      <- liftIO newChan
+  cid              <- mkConsumerId cin app
+  (fin, fout)      <- liftIO newChan
   ref              <- liftIO $ newIORef 0
   var              <- liftIO newEmptyMVar
   let permits = issuePermits conn cid
       acquire = do
         mkSubscriber conn cid app
-        forkIO (fetcher chan fchan ref permits)
+        forkIO (fetcher cout fin ref permits)
       release i =
         killThread i >> newReq app >>= \(r, v) -> C.closeConsumer conn v cid r
       handler = managed (bracket acquire release) >> liftIO (readMVar var)
   worker <- liftIO $ async (runManaged $ void handler)
   addWorker app (worker, var)
-  return $ Consumer (liftIO $ readChan fchan) (acker conn cid)
+  return $ Consumer (liftIO $ readChan fout) (acker conn cid)
  where
   newReq app = mkRequestId app
   acker conn cid (MsgId mid) = liftIO $ C.ack conn cid mid
@@ -123,8 +123,8 @@ newConsumer topic sub = do
  - It also keeps count of the internal fetcher channel size and issues new permits (FLOW)
  - whenever necessary.
  -}
-fetcher :: Chan Response -> Chan Message -> IORef Int -> IO a -> IO b
-fetcher chan fc ref f = forever $ readChan chan >>= \case
+fetcher :: OutChan Response -> InChan Message -> IORef Int -> IO a -> IO b
+fetcher cout fcin ref f = forever $ readChan cout >>= \case
   PayloadResponse cmd _ p -> for_ (cmd ^. F.maybe'message) $ \msg -> do
     let msgId = msg ^. F.messageId
         pm    = Message (MsgId msgId) $ maybe "" (\(Payload x) -> x) p
@@ -133,5 +133,5 @@ fetcher chan fc ref f = forever $ readChan chan >>= \case
     updateQueueSize ref (+ 1)
     size <- readIORef ref
     when (size >= defaultQueueSize `div` 2) (f >> reset)
-    writeChan fc pm
+    writeChan fcin pm
   _ -> return ()

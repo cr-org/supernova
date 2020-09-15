@@ -10,7 +10,7 @@ import           Control.Concurrent             ( forkIO
 import           Control.Concurrent.Async       ( async
                                                 , concurrently_
                                                 )
-import           Control.Concurrent.Chan
+import           Control.Concurrent.Chan.Unagi
 import           Control.Concurrent.MVar
 import           Control.Exception              ( throwIO )
 import           Control.Monad                  ( forever
@@ -74,12 +74,12 @@ connect (ConnData h p) = do
   socket <- acquireSocket h p
   liftIO $ sendSimpleCmd socket P.connect
   checkConnection socket
-  app   <- liftIO initAppState
-  kchan <- liftIO newChan
-  var   <- liftIO newEmptyMVar
+  app         <- liftIO initAppState
+  (cin, cout) <- liftIO newChan
+  var         <- liftIO newEmptyMVar
   let
-    dispatcher = recvDispatch socket app kchan
-    task       = concurrently_ dispatcher (keepAlive socket kchan)
+    dispatcher = recvDispatch socket app cin
+    task       = concurrently_ dispatcher (keepAlive socket cout)
     handler =
       managed (bracket (forkIO task) (\i -> readMVar var >> killThread i))
   worker <- liftIO $ async (runManaged $ void handler)
@@ -109,9 +109,9 @@ responseForSendReceipt cmd =
       sid  = SeqId . view F.sequenceId <$> cmd'
   in  (,) <$> pid <*> sid
 
-pongResponse :: BaseCommand -> Chan BaseCommand -> IO (Maybe ())
-pongResponse cmd chan =
-  traverse (const $ writeChan chan cmd) (cmd ^. F.maybe'pong)
+pongResponse :: BaseCommand -> InChan BaseCommand -> IO (Maybe ())
+pongResponse cmd inChan =
+  traverse (const $ writeChan inChan cmd) (cmd ^. F.maybe'pong)
 
 messageResponse :: BaseCommand -> Maybe ConsumerId
 messageResponse cmd =
@@ -121,8 +121,8 @@ messageResponse cmd =
 
 {- | It listens to incoming messages directly from the network socket and it writes them to all the
  - consumers and producers' communication channels. -}
-recvDispatch :: NS.Socket -> IORef AppState -> Chan BaseCommand -> IO ()
-recvDispatch s ref chan = forever $ do
+recvDispatch :: NS.Socket -> IORef AppState -> InChan BaseCommand -> IO ()
+recvDispatch s ref inChan = forever $ do
   resp <- receive s
   cs   <- _appConsumers <$> readIORef ref
   let
@@ -134,15 +134,15 @@ recvDispatch s ref chan = forever $ do
   traverse_ f (responseForRequest cmd)
   traverse_ g (responseForSendReceipt cmd)
   traverse_ h (messageResponse cmd)
-  pongResponse cmd chan
+  pongResponse cmd inChan
 
 {- Emit a PING and expect a PONG every 29 seconds. If a PONG is not received, interrupt connection -}
-keepAlive :: NS.Socket -> Chan BaseCommand -> IO ()
-keepAlive s chan = forever $ do
+keepAlive :: NS.Socket -> OutChan BaseCommand -> IO ()
+keepAlive s outChan = forever $ do
   threadDelay (29 * 1000000)
   logRequest P.ping
   sendSimpleCmd s P.ping
-  timeout (2 * 1000000) (readChan chan) >>= \case
+  timeout (2 * 1000000) (readChan outChan) >>= \case
     Just cmd -> logResponse cmd
     Nothing  -> throwIO $ userError "Keep Alive interruption"
 

@@ -4,7 +4,7 @@
 module Pulsar.AppState where
 
 import           Control.Concurrent.Async       ( Async )
-import           Control.Concurrent.Chan
+import           Control.Concurrent.Chan.Unagi
 import           Control.Concurrent.MVar
 import           Control.Monad.IO.Class
 import qualified Data.Binary                   as B
@@ -28,7 +28,7 @@ type Worker = (Async (), MVar ())
 type ProducerSeqs = [(SeqId, MVar Response)]
 
 data AppState = AppState
-  { _appConsumers :: [(ConsumerId, Chan Response)]    -- a list of consumer identifiers associated with a communication channel
+  { _appConsumers :: [(ConsumerId, InChan Response)]  -- a list of consumer identifiers associated with a communication channel
   , _appConsumerId :: ConsumerId                      -- an incremental counter to assign unique consumer ids
   , _appProducerId :: ProducerId                      -- an incremental counter to assign unique producer ids
   , _appRequestId :: ReqId                            -- an incremental counter to assign unique request ids for all commands
@@ -38,7 +38,7 @@ data AppState = AppState
   }
 $(makeLenses ''AppState)
 
-mkConsumerId :: MonadIO m => Chan Response -> IORef AppState -> m ConsumerId
+mkConsumerId :: MonadIO m => InChan Response -> IORef AppState -> m ConsumerId
 mkConsumerId chan ref = liftIO $ atomicModifyIORef ref $ \app ->
   let cid = app ^. appConsumerId
       f   = over appConsumers ((cid, chan) :) app
