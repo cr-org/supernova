@@ -1,7 +1,7 @@
 cabal-version:       3.0
 
 name:                supernova
-version:             0.0.2
+version:             0.0.3
 synopsis:            Apache Pulsar client for Haskell
 description:         Supernova is an Apache Pulsar client that implements the specified TCP protocol.
 homepage:            https://github.com/cr-org/supernova
