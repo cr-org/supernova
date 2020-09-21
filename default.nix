@@ -1,3 +1,6 @@
-{ pkgs ? import <nixpkgs> {} }:
+{ packages ? import lib/pkgs.nix { inherit compiler; }, compiler ? "ghc884" }:
 
-pkgs.callPackage lib/default.nix {}
+let
+  inherit (packages) pkgs;
+in
+  pkgs.callPackage lib/default.nix {}
