@@ -165,10 +165,9 @@ receive s = liftIO $ do
   msg <- SBL.recv s $ fromIntegral frameMaxSize
   case decodeBaseCommand msg of
     Left  e    -> fail $ "Decoding error: " <> e
-    Right resp -> case getCommand resp ^. F.maybe'ping of
-      Just _ -> do
-        logResponse $ getCommand resp
-        logRequest P.pong
-        sendSimpleCmd s P.pong
-        return resp
-      Nothing -> return resp
+    Right resp -> resp <$ traverse_ (const $ f resp) (getCommand resp ^. F.maybe'ping)
+ where
+  f resp = do
+    logResponse $ getCommand resp
+    logRequest P.pong
+    sendSimpleCmd s P.pong
